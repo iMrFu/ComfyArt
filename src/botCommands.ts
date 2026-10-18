@@ -364,6 +364,70 @@ const HANDLERS: Record<string, Handler> = {
       ...(out.note ? { note: out.note } : {}),
     }
   },
+  mix_audio_video: async (editor, args, onError) => {
+    const videoId = args.video
+    const audioId = args.audio
+    if (!videoId || !audioId) throw new Error('mix_audio_video needs video and audio shape ids')
+    const vSrc = mediaSrc(editor, shapeOf(editor, videoId))
+    const aSrc = mediaSrc(editor, shapeOf(editor, audioId))
+    if (!vSrc) throw new Error(`${videoId} has no media`)
+    if (!aSrc) throw new Error(`${audioId} has no media`)
+
+    let clips = args.audio_clips
+    if (clips != null && !Array.isArray(clips)) clips = [clips]
+    if (Array.isArray(clips)) {
+      clips = clips.map((c: any) => {
+        const o: any = {}
+        if (c.in != null) o.in = Number(c.in)
+        if (c.out != null) o.out = Number(c.out)
+        if (c.at != null) o.at = Number(c.at)
+        return o
+      })
+    }
+
+    const payload: any = {
+      video: vSrc,
+      audio: aSrc,
+      mode: args.mode === 'mix' ? 'mix' : 'replace',
+    }
+    if (clips) payload.audio_clips = clips
+    if (args.volume != null) payload.volume = Number(args.volume)
+    if (args.bg_volume != null) payload.bg_volume = Number(args.bg_volume)
+    if (args.video_in != null) payload.video_in = Number(args.video_in)
+    if (args.video_out != null) payload.video_out = Number(args.video_out)
+
+    let out: any
+    try {
+      const res = await api('/comfyart/mix_audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error || `mix_audio failed: ${res.status}`)
+      }
+      out = await res.json()
+    } catch (e) {
+      onError(errorText(e))
+      throw e
+    }
+    const ref: ImageRef = { filename: out.filename, subfolder: out.subfolder, type: out.type }
+    const media: Media = { ref, src: out.url, w: out.width, h: out.height, kind: 'video' }
+    const v = editor.getShapePageBounds(shapeOf(editor, videoId))!
+    const id = placeMedia(editor, media, out.filename || 'mix.mp4', v.maxX + GAP, v.y, v.w)
+    return {
+      id,
+      url: out.url,
+      duration: out.duration,
+      width: out.width,
+      height: out.height,
+      mode: out.mode,
+      segments: out.num_segments,
+      clip_ranges: out.segments,
+      ...(out.note ? { note: out.note } : {}),
+    }
+  },
   place_html: (editor, args) => {
     const id = placeHtml(editor, String(args.html), String(args.name ?? t('botCommands.webPage')))
     editor.updateShape<HtmlShape>({

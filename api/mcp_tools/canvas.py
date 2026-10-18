@@ -272,6 +272,29 @@ SPECS: dict[str, dict] = {
          "sources": {"type": "array", "items": {"type": "string"}, "description": "legacy: list of whole-clip shape ids"},
          "audio": {"type": "string", "enum": ["concat", "first", "none"], "description": "how to handle audio"}},
         ["clips"], timeout=120),
+    "mix_audio_video": _tool(
+        "Merge a narration audio shape into a (trimmed) video shape and output a final video. The "
+        "narration can be cut first: audio_clips is an optional ordered list of {in?, out?, at?} where "
+        "each item cuts the audio sub-range [in, out] and places it at second 'at' on the video "
+        "timeline (omit the list to use the whole audio from 0, or pass a single item for a one-cut trim). "
+        "mode controls the soundtrack: 'replace' swaps the video's audio for the narration (gaps silent), "
+        "'mix' keeps the original audio and overlays the narration on top (volume / bg_volume adjustable). "
+        "video / audio are shape ids; optional video_in / video_out trim the video first. Returns the new "
+        "video shape id, its view URL, width/height, duration, the merge mode and the per-segment list.",
+        {"video": _ID, "audio": _ID,
+         "mode": {"type": "string", "enum": ["replace", "mix"],
+                  "description": "replace original audio (default) or mix narration over it"},
+         "audio_clips": {"type": "array",
+                         "items": {"type": "object", "properties": {
+                             "in": {"type": "number", "description": "cut start second (default 0)"},
+                             "out": {"type": "number", "description": "cut end second (default audio end)"},
+                             "at": {"type": "number", "description": "place at this second on the video timeline (default 0)"}}},
+                         "description": "optional narration cuts; omit to use whole audio"},
+         "volume": {"type": "number", "description": "narration volume (default 1.0)"},
+         "bg_volume": {"type": "number", "description": "original audio volume in mix mode (default 1.0)"},
+         "video_in": {"type": "number", "description": "trim video from this second"},
+         "video_out": {"type": "number", "description": "trim video to this second"}},
+        ["video", "audio"], timeout=120),
     "memory": _tool(
         "The user's long-term memory across projects. action list; add with text and category (about, "
         "taste, work, assets); correct with old (copied exactly) and new; forget with text (copied "

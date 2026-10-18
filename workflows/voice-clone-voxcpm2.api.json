@@ -8,7 +8,7 @@
    "voice_design": "",
    "cfg": 2.0,
    "steps": 10,
-   "normalize_text": false,
+   "normalize_text": true,
    "seed": -1,
       "force_offload": false,
       "device": "cuda",
