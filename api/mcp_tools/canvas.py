@@ -236,6 +236,33 @@ SPECS: dict[str, dict] = {
     "focus": _tool(
         "Show shapes to the user: switch page if needed, select them and zoom to them.",
         {"ids": _IDS}, ["ids"]),
+    "concat_videos": _tool(
+        "Concatenate two or more video shapes on the canvas into one longer video, in order, optionally "
+        "trimming each clip. clips is an ordered list: each item is either a video shape id (whole clip) "
+        "or {source|url: shape id, in?: seconds, out?: seconds} to keep only the sub-range [in, out]. "
+        "sources (legacy) is still accepted as a list of whole-clip shape ids. audio picks the sound: "
+        "'concat' keeps and joins every clip's audio, 'first' keeps only the first clip's audio (rest "
+        "silent), 'none' drops audio entirely. Returns the new video shape id, its view URL, width/height, "
+        "duration in seconds, segment count, per-segment in/out and the effective audio mode.",
+        {"clips": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+                "oneOf": [
+                    {"type": "string", "description": "video shape id — use the whole clip"},
+                    {"type": "object", "properties": {
+                        "source": {"type": "string", "description": "video shape id"},
+                        "url": {"type": "string", "description": "video view url (alternative to source)"},
+                        "in": {"type": "number", "description": "start second (optional, default 0)"},
+                        "out": {"type": "number", "description": "end second (optional, default clip end)"},
+                    }},
+                ],
+            },
+            "description": "ordered clips to join (2+): id/whole or {source|url, in?, out?}",
+        },
+         "sources": {"type": "array", "items": {"type": "string"}, "description": "legacy: list of whole-clip shape ids"},
+         "audio": {"type": "string", "enum": ["concat", "first", "none"], "description": "how to handle audio"}},
+        ["clips"], timeout=120),
     "memory": _tool(
         "The user's long-term memory across projects. action list; add with text and category (about, "
         "taste, work, assets); correct with old (copied exactly) and new; forget with text (copied "

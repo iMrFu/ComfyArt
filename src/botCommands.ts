@@ -4,11 +4,11 @@ import * as actions from './actions'
 import { generateAudio, imageTo3d, VOICES } from './assetGen'
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
-import { api } from './comfy'
+import { api, type ImageRef } from './comfy'
 import { placeHtml } from './embeds'
 import { capRefs, createGenerator, DURATIONS, generate, genInfoOf, RATIOS, VIDEO_RATIOS } from './generate'
 import { MAX_VIDEO_REF_KINDS } from './workflows'
-import { type ErrorSink, errorText, fileSrc, jobOf, mediaAsset, resultsAtom } from './jobs'
+import { type ErrorSink, errorText, fileSrc, jobOf, mediaAsset, placeMedia, type Media, resultsAtom } from './jobs'
 import { describeItem, itemImages, libraryAtom, linkedKit } from './library'
 import { correct, forget, memoryAtom, remember } from './memory'
 import { agentModels } from './models'
@@ -33,6 +33,10 @@ type Handler = (editor: Editor, args: Args, onError: ErrorSink) => unknown
 const MAX_SHAPES = 300
 const VIEW_MAX_PX = 1024
 const GAP = 40
+
+function mediaSrc(editor: Editor, shape: TLShape): string | null {
+  return mediaAsset(editor, shape)?.props.src ?? null
+}
 
 function shapeOf(editor: Editor, id: unknown): TLShape {
   const shape = typeof id === 'string' ? editor.getShape(id as TLShapeId) : undefined
@@ -303,6 +307,58 @@ const HANDLERS: Record<string, Handler> = {
   },
   image_to_3d: (editor, args, onError) => started(editor, imageTo3d(editor, imageOf(editor, args.id), onError)),
   wait_generation: (editor, args) => waitResults(editor, (args.ids ?? []).map(String), Number(args.timeout_s) || 60),
+  concat_videos: async (editor, args, onError) => {
+    const raw = Array.isArray(args.clips) ? args.clips : (Array.isArray(args.sources) ? args.sources : [])
+    if (raw.length < 2) throw new Error('concat_videos needs at least 2 clips in clips (or sources)')
+    const clips = raw.map((c: any) => {
+      if (typeof c === 'string') {
+        const src = mediaSrc(editor, shapeOf(editor, c))
+        if (!src) throw new Error(`${c} has no media`)
+        return { url: src }
+      }
+      if (c && typeof c === 'object') {
+        const id = c.source ?? c.url
+        const src = mediaSrc(editor, shapeOf(editor, id))
+        if (!src) throw new Error(`${id} has no media`)
+        return { url: src, ...(c.in != null ? { in: Number(c.in) } : {}), ...(c.out != null ? { out: Number(c.out) } : {}) }
+      }
+      throw new Error('each clip must be a shape id string or {source|url, in?, out?}')
+    })
+    const audio = args.audio === 'first' || args.audio === 'concat' ? args.audio : 'none'
+    let out: any
+    try {
+      const res = await api('/comfyart/concat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clips, audio }),
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error || `concat failed: ${res.status}`)
+      }
+      out = await res.json()
+    } catch (e) {
+      onError(errorText(e))
+      throw e
+    }
+    const ref: ImageRef = { filename: out.filename, subfolder: out.subfolder, type: out.type }
+    const media: Media = { ref, src: out.url, w: out.width, h: out.height, kind: 'video' }
+    const lastRaw = raw[raw.length - 1]
+    const lastId = typeof lastRaw === 'string' ? lastRaw : (lastRaw.source ?? lastRaw.url)
+    const last = editor.getShapePageBounds(shapeOf(editor, lastId))!
+    const id = placeMedia(editor, media, out.filename || 'concat.mp4', last.maxX + GAP, last.y, last.w)
+    return {
+      id,
+      url: out.url,
+      duration: out.duration,
+      width: out.width,
+      height: out.height,
+      segments: out.num_segments,
+      clip_ranges: out.segments,
+      audio: out.audio,
+      ...(out.note ? { note: out.note } : {}),
+    }
+  },
   place_html: (editor, args) => {
     const id = placeHtml(editor, String(args.html), String(args.name ?? t('botCommands.webPage')))
     editor.updateShape<HtmlShape>({

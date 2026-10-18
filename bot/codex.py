@@ -346,6 +346,14 @@ class CodexCodeProvider(AgentProvider):
                 "-c", f"mcp_servers.comfyart.tool_timeout_sec={_MCP_TOOL_TIMEOUT_SEC}",
             ]
         flags += self._mcp_lockdown_args()
+        if turn.comfy_mcp_argv:
+            args_toml = "[" + ", ".join("'%s'" % a for a in turn.comfy_mcp_argv[1:]) + "]"
+            flags += [
+                "-c", 'mcp_servers.comfy.type="stdio"',
+                "-c", f"mcp_servers.comfy.command='{turn.comfy_mcp_argv[0]}'",
+                "-c", f"mcp_servers.comfy.args={args_toml}",
+                "-c", "mcp_servers.comfy.enabled=true",
+            ]
         flags += ["-c", "features.shell_tool=false"]
         flags += ["-c", 'web_search="disabled"']
         flags += ["-c", 'approvals_reviewer="auto_review"']
