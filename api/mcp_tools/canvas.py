@@ -163,10 +163,19 @@ SPECS: dict[str, dict] = {
         "seconds (default 8, max 47). Returns ids for wait_generation.",
         {"prompt": {"type": "string"}, "duration": {"type": "integer"}}, ["prompt"], approval="生成音效"),
     "text_to_speech": _tool(
-        "Read text aloud as an audio element. voice is a built-in voice id (zf_/zm_ Chinese female/male, "
-        "af_/am_ American, bf_/bm_ British, jf_/jm_ Japanese; default zf_xiaoxiao), or pass reference "
-        "(an audio shape id) to clone that recording's voice. Returns ids for wait_generation.",
-        {"text": {"type": "string"}, "voice": {"type": "string"}, "reference": _ID}, ["text"], approval="生成配音"),
+        "Read text aloud as an audio element. model selects the TTS engine: 'voxcpm2' (default, local "
+        "VoxCPM2 model) supports voice_design, a text description of the voice such as 'gentle young "
+        "Chinese female'; 'voxcpm2_clone' clones the reference audio shape; 'kokoro' uses built-in "
+        "speakers and needs the KokoroSpeaker node. voice is a Kokoro voice id (zf_/zm_ Chinese, etc.) "
+        "used only with model='kokoro'. reference is an audio shape id used for cloning. "
+        "Returns ids for wait_generation.",
+        {"text": {"type": "string"},
+         "model": {"type": "string", "enum": ["voxcpm2", "voxcpm2_clone", "kokoro"],
+                   "description": "TTS engine (default voxcpm2)"},
+         "voice": {"type": "string", "description": "Kokoro voice id (model=kokoro only)"},
+         "voice_design": {"type": "string", "description": "voice description for model=voxcpm2"},
+         "reference": _ID},
+        ["text"], approval="生成配音"),
     "edit_elements": _tool(
         "Turn the text inside an image shape into editable text: OCR finds each line, the text is erased "
         "from the picture, and a new artboard holds the clean background plus one editable text shape "

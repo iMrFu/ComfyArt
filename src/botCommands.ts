@@ -280,13 +280,18 @@ const HANDLERS: Record<string, Handler> = {
   generate_music: (editor, args, onError) => started(editor, generateAudio(editor, { kind: 'music', prompt: String(args.prompt), lyrics: String(args.lyrics ?? ''), seconds: Math.min(240, Math.max(5, Number(args.duration) || 30)) }, onError, true)),
   generate_sound_effect: (editor, args, onError) => started(editor, generateAudio(editor, { kind: 'sfx', prompt: String(args.prompt), seconds: Math.min(47, Math.max(1, Number(args.duration) || 8)) }, onError, true)),
   text_to_speech: (editor, args, onError) => {
-    if (args.reference) {
+    const text = String(args.text)
+    const model = String(args.model ?? 'voxcpm2')
+    if (args.reference && model !== 'kokoro') {
       const shape = shapeOf(editor, args.reference)
       if (shape.type !== AUDIO) throw new Error(`${shape.id} is not an audio shape`)
-      return started(editor, generateAudio(editor, { kind: 'clone', text: String(args.text), reference: fileSrc(editor, shape)! }, onError, true))
+      return started(editor, generateAudio(editor, { kind: 'voxcpm2_clone', text, reference: fileSrc(editor, shape)! }, onError, true))
+    }
+    if (model === 'voxcpm2') {
+      return started(editor, generateAudio(editor, { kind: 'voxcpm2', text, voiceDesign: String(args.voice_design ?? '') }, onError, true))
     }
     if (args.voice && !VOICES.includes(args.voice)) throw new Error(`voice must be one of ${VOICES.join(', ')}`)
-    return started(editor, generateAudio(editor, { kind: 'speech', text: String(args.text), voice: args.voice ?? VOICES[0] }, onError, true))
+    return started(editor, generateAudio(editor, { kind: 'speech', text, voice: args.voice ?? VOICES[0] }, onError, true))
   },
   edit_elements: (editor, args, onError) => started(editor, editElements(editor, imageOf(editor, args.id), onError)),
   create_mockup: (editor, args, onError) => started(editor, createMockup(editor, imageOf(editor, args.id), onError)),
