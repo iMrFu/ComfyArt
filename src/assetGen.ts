@@ -19,6 +19,8 @@ export type AudioSpec =
   | { kind: 'music'; prompt: string; lyrics: string; seconds: number }
   | { kind: 'speech'; text: string; voice: string }
   | { kind: 'clone'; text: string; reference: string }
+  | { kind: 'voxcpm2'; text: string; voiceDesign: string }
+  | { kind: 'voxcpm2_clone'; text: string; reference: string }
   | { kind: 'sfx'; prompt: string; seconds: number }
 
 const seed = () => Math.floor(Math.random() * 2 ** 31)
@@ -44,13 +46,25 @@ async function audioGraph(spec: AudioSpec): Promise<Built> {
     Object.assign(g['2'].inputs, { text: spec.text, lang: LANGS[spec.voice[0]] ?? 'English' })
     return { graph: g, result: '3' }
   }
+  if (spec.kind === 'voxcpm2') {
+    const g = await loadWorkflow('speech-voxcpm2.api.json')
+    g['1'].inputs.text = spec.text
+    g['1'].inputs.voice_design = spec.voiceDesign || ''
+    return { graph: g, result: '2' }
+  }
+  if (spec.kind === 'voxcpm2_clone') {
+    const g = await loadWorkflow('voice-clone-voxcpm2.api.json')
+    g['1'].inputs.text = spec.text
+    g['2'].inputs.audio = annotated(spec.reference)
+    return { graph: g, result: '4' }
+  }
   const g = await loadWorkflow('voice-clone-indextts.api.json')
   g['1'].inputs.audio = annotated(spec.reference)
   Object.assign(g['3'].inputs, { text: spec.text, seed: seed() })
   return { graph: g, result: '4' }
 }
 
-const LABELS: Record<AudioSpec['kind'], string> = { music: t('audio.music'), speech: t('audio.voiceover'), clone: t('audio.voiceover'), sfx: t('audio.soundEffect') }
+const LABELS: Record<AudioSpec['kind'], string> = { music: t('audio.music'), speech: t('audio.voiceover'), clone: t('audio.voiceover'), voxcpm2: t('audio.voxcpm2'), voxcpm2_clone: t('audio.voxcpm2Clone'), sfx: t('audio.soundEffect') }
 
 export function generateAudio(editor: Editor, spec: AudioSpec, onError: ErrorSink, quiet = false): TLShapeId {
   const [w, h] = AUDIO_SIZE
@@ -58,7 +72,7 @@ export function generateAudio(editor: Editor, spec: AudioSpec, onError: ErrorSin
   const id = createShapeId()
   editor.createShape({ id, type: GENERATOR, x, y, props: { w, h }, meta: { temp: true, quiet } })
   if (!quiet) editor.zoomToBounds({ x, y, w, h }, { inset: 200, animation: { duration: 200 } })
-  const text = spec.kind === 'speech' || spec.kind === 'clone' ? spec.text : spec.prompt
+  const text = spec.kind === 'speech' || spec.kind === 'clone' || spec.kind === 'voxcpm2' || spec.kind === 'voxcpm2_clone' ? spec.text : spec.prompt
   void startJob(editor, id, audioGraph(spec), { name: `${LABELS[spec.kind]} · ${text.slice(0, 24)}`, kind: 'audio', placer: 'audio' }, onError)
   return id
 }

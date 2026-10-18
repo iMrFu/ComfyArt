@@ -1,0 +1,40 @@
+{
+  "1": {
+    "class_type": "VoxCPM_TTS",
+    "inputs": {
+      "model_name": "VoxCPM2",
+      "lora_name": "None",
+      "text": "",
+      "voice_design": "",
+      "cfg": 2.0,
+      "steps": 10,
+      "seed": -1,
+      "force_offload": false,
+      "device": "cuda",
+      "dtype": "auto",
+      "voice_config": ["3", 0]
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": ""
+    }
+  },
+  "3": {
+    "class_type": "VoxCPM_VoiceCloning",
+    "inputs": {
+      "prompt_text": "",
+      "prompt_audio": "",
+      "reference_audio": ["2", 0],
+      "trim_silence": false
+    }
+  },
+  "4": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": ["1", 0],
+      "filename_prefix": "comfyart/audio"
+    }
+  }
+}

@@ -9,6 +9,8 @@ import { t } from '../i18n'
 type Tab = 'music' | 'speech' | 'sfx'
 const TABS: [Tab, string][] = [['music', t('audio.music')], ['speech', t('audio.voiceover')], ['sfx', t('audio.soundEffect')]]
 const CLONE = 'clone'
+const VOXCPM2 = 'voxcpm2'
+const VOXCPM2_CLONE = 'voxcpm2_clone'
 
 export const audioDialogAtom = atom<boolean>('audio dialog', false)
 
@@ -19,6 +21,7 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
   const [lyrics, setLyrics] = useState('')
   const [seconds, setSeconds] = useState(30)
   const [voice, setVoice] = useState(VOICES[0])
+  const [voiceDesign, setVoiceDesign] = useState('')
   const reference = useValue('selected audio', () => {
     const s = editor.getOnlySelectedShape()
     return s?.type === AUDIO ? (s as AudioShape).props.src : null
@@ -35,7 +38,10 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
     if (!text) return null
     if (tab === 'music') return { kind: 'music', prompt: text, lyrics: lyrics.trim(), seconds }
     if (tab === 'sfx') return { kind: 'sfx', prompt: text, seconds }
-    return voice === CLONE && reference ? { kind: 'clone', text, reference } : { kind: 'speech', text, voice: voice === CLONE ? VOICES[0] : voice }
+    if (voice === CLONE && reference) return { kind: 'clone', text, reference }
+    if (voice === VOXCPM2_CLONE && reference) return { kind: 'voxcpm2_clone', text, reference }
+    if (voice === VOXCPM2) return { kind: 'voxcpm2', text, voiceDesign: voiceDesign.trim() }
+    return { kind: 'speech', text, voice }
   }
   const run = () => {
     const s = spec()
@@ -67,12 +73,21 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
             <textarea className="ca-panel__prompt ca-panel__prompt--boxed" value={lyrics} placeholder={t('audio.lyricsPlaceholder')} onChange={(e) => setLyrics(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
           )}
           {tab === 'speech' ? (
-            <div className="ca-rename__field"><span>{t('audio.voice')}</span>
-              <select className="ca-panel__input" value={voice} onChange={(e) => setVoice(e.target.value)}>
-                {reference && <option value={CLONE}>{t('audio.cloneSelected')}</option>}
-                {VOICES.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
+            <>
+              <div className="ca-rename__field"><span>{t('audio.voice')}</span>
+                <select className="ca-panel__input" value={voice} onChange={(e) => setVoice(e.target.value)}>
+                  {reference && <option value={CLONE}>{t('audio.cloneSelected')}</option>}
+                  {reference && <option value={VOXCPM2_CLONE}>{t('audio.voxcpm2Clone')}</option>}
+                  {VOICES.map((v) => <option key={v} value={v}>{v}</option>)}
+                  <option value={VOXCPM2}>{t('audio.voxcpm2')}</option>
+                </select>
+              </div>
+              {voice === VOXCPM2 && (
+                <div className="ca-rename__field"><span>{t('audio.voiceDesign')}</span>
+                  <input className="ca-panel__input" value={voiceDesign} placeholder={t('audio.voiceDesignPlaceholder')} onChange={(e) => setVoiceDesign(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+                </div>
+              )}
+            </>
           ) : (
             <div className="ca-rename__field"><span>{t('audio.duration')}</span>
               <div className="ca-panel__chips">
