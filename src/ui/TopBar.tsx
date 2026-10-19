@@ -62,7 +62,7 @@ export function TopBar({ editor, left }: { editor: Editor; left?: React.ReactNod
               <span className="ca-tab__name">{p.name}</span>
             )}
             {pages.length > 1 && (
-              <button type="button" className="ca-tab__close" title={t('topBar.deletePage')} onClick={(e) => { e.stopPropagation(); confirmAtom.set({ title: t('topBar.deleteThisCanvasPage'), desc: t('topBar.everythingOnCanvasPageWill', p.name), ok: t('common.delete'), run: () => editor.deletePage(p.id) }) }}>
+              <button type="button" className="ca-tab__close" title={t('topBar.deletePage')} onClick={(e) => { e.stopPropagation(); confirmAtom.set({ danger: true, title: t('topBar.deleteThisCanvasPage'), desc: t('topBar.everythingOnCanvasPageWill', p.name), ok: t('common.delete'), run: () => editor.deletePage(p.id) }) }}>
                 <span className="ca-icon">{Icons.close}</span>
               </button>
             )}

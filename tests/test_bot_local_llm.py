@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 
-from ComfyArt.bot._cli_common import CORE_MCP_TOOLS
+from ComfyArt.bot import lms
+from ComfyArt.bot.guide import CORE_MCP_TOOLS
 from ComfyArt.bot.local_llm import LocalLlmProvider, _user_content
 from ComfyArt.bot.providers import BotEvent, TurnHandle, TurnRequest
 
@@ -116,7 +117,7 @@ class TestWaitLoop:
             return json.dumps({"status": "done", "results": []}), []
 
         monkeypatch.setattr(provider, "_mcp_call_tool", fake_call)
-        monkeypatch.setattr(provider, "_lms_bin", lambda: "")
+        monkeypatch.setattr(lms, "lms_bin", lambda: "")
         raw = await provider._wait_stage_done(
             None, "http://x/mcp", {"ids": ["shape:a"]}, "m", TurnHandle())
         assert json.loads(raw)["status"] == "done"
@@ -158,6 +159,30 @@ class TestAgentLoop:
         assert events[0].name == "server_info"
         assert events[1].text == '{"comfyart_version": "1.9.0"}'
         assert events[-1].text == "all good"
+
+    async def test_reasoning_streams_as_thinking(self, monkeypatch):
+        provider = LocalLlmProvider(base_url=lambda: "http://x/v1")
+        chat_responses = [
+            {"choices": [{"message": {"content": "", "reasoning_content": "check first",
+                                      "tool_calls": [{"id": "t1", "function": {"name": "server_info", "arguments": "{}"}}]}}]},
+            {"choices": [{"message": {"content": "<think>looks fine</think>all good", "tool_calls": []}}]},
+        ]
+
+        async def fake_request(session, method, url, *, headers, json_body=None, timeout=120):
+            if url.endswith("/chat/completions"):
+                return chat_responses.pop(0)
+            return {"result": {"tools": [{"name": "server_info"}]}}
+
+        async def fake_call(session, endpoint, name, arguments):
+            return "{}", []
+
+        monkeypatch.setattr(provider, "_request_json", fake_request)
+        monkeypatch.setattr(provider, "_mcp_call_tool", fake_call)
+        events: list[BotEvent] = []
+        await provider.send(TurnRequest(chat_id="c", user_text="hi", mcp_endpoint="http://x/mcp", model="m1"),
+                            _collect(events), TurnHandle())
+        assert [(e.t, e.text) for e in events if e.t in ("thinking", "delta")] == [
+            ("thinking", "check first"), ("thinking", "looks fine"), ("delta", "all good")]
 
     async def test_usage_accumulates_and_tool_ids_flow(self, monkeypatch):
         provider = LocalLlmProvider(base_url=lambda: "http://x/v1")

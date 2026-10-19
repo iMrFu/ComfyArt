@@ -14,14 +14,15 @@ except ImportError:
     tomllib = None
 
 from ._cli_common import (
-    AGENT_GUIDE,
     PROBE_CACHE_S,
     TOOL_RESULT_CAP,
     base_spawn_env,
     kill_process_tree,
     normalize_usage,
     run_cli_turn,
+    run_command,
 )
+from .guide import AGENT_GUIDE
 from .providers import (
     AgentProvider,
     BotEvent,
@@ -192,12 +193,12 @@ class _CodexStreamParser:
         item_type = item.get("type")
         item_id = str(item.get("id") or "")
 
-        if item_type == "agent_message":
+        if item_type in ("agent_message", "reasoning"):
             text = str(item.get("text") or "")
             emitted = self._text_emitted.get(item_id, 0)
             delta = text[emitted:] if len(text) >= emitted else text
             self._text_emitted[item_id] = len(text)
-            return [BotEvent(t="delta", text=delta)] if delta else []
+            return [BotEvent(t="delta" if item_type == "agent_message" else "thinking", text=delta)] if delta else []
 
         if item_type == "mcp_tool_call":
             name = str(item.get("tool") or "")
@@ -280,13 +281,7 @@ class CodexCodeProvider(AgentProvider):
             self._probe_cache = (now, status)
             return status
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *argv, "--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=base_spawn_env(),
-            )
-            out, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+            _, out, _ = await run_command([*argv, "--version"], timeout=15, env=base_spawn_env())
             version = (out or b"").decode("utf-8", "replace").strip()
         except (OSError, asyncio.TimeoutError) as e:
             status = ProviderStatus(available=False, detail=f"version check failed: {e}")

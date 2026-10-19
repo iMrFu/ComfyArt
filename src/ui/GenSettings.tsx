@@ -1,8 +1,9 @@
 import { useState } from 'react'
 
-import { DURATIONS, QUALITIES, RATIOS, RESOLUTIONS, SHOTS, STYLES, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from '../generate'
+import { DURATIONS, QUALITIES, RATIOS, RESOLUTIONS, SHOTS, STYLES, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from '../genOptions'
 import { isInstalled, type ModelDef } from '../models'
 import type { GeneratorShape } from '../shapes/GeneratorShape'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 import { Icons } from './icons'
 import { Popover } from './Popover'
@@ -14,14 +15,6 @@ function RatioShape({ ratio }: { ratio: string }) {
   const [a, b] = ratio.split(':').map(Number)
   const k = 14 / Math.max(a, b)
   return <span className="ca-gen__shape" style={{ width: a * k, height: b * k }} />
-}
-
-function Chips<T extends string | number>({ value, options, onPick }: { value: T; options: [T, string][]; onPick: (v: T) => void }) {
-  return (
-    <div className="ca-gen__chips">
-      {options.map(([v, label]) => <button key={String(v)} type="button" className="ca-gen__chip" data-on={value === v || undefined} onClick={() => onPick(v)}>{label}</button>)}
-    </div>
-  )
 }
 
 export function settingsSummary(p: GeneratorShape['props'], video: boolean) {
@@ -71,7 +64,7 @@ export function GenSettings({ p, video, quality, update }: { p: GeneratorShape['
       {!video && (
         <>
           <div className="ca-gen__label">{t('genSettings.resolution')}</div>
-          <Chips value={p.resolution} options={RESOLUTIONS.map((r) => [r, RES_LABELS[r]] as [string, string])} onPick={(r) => update({ resolution: r })} />
+          <Chips value={p.resolution} options={RESOLUTIONS.map((r) => [r, RES_LABELS[r]] as [string, string])} onPick={(r) => update({ resolution: r })} gen />
           {p.resolution === 'custom' && (
             <div className="ca-style__row">
               <label className="ca-num"><span>W</span><input type="number" min={64} max={4096} value={p.cw} onChange={(e) => dim('cw', Number(e.target.value))} onKeyDown={(e) => e.stopPropagation()} /></label>
@@ -96,17 +89,17 @@ export function GenSettings({ p, video, quality, update }: { p: GeneratorShape['
       {video && (
         <>
           <div className="ca-gen__label">{t('genSettings.resolution')}</div>
-          <Chips value={VIDEO_RESOLUTIONS.includes(p.resolution) ? p.resolution : VIDEO_RESOLUTIONS[0]} options={VIDEO_RESOLUTIONS.map((r) => [r, r] as [string, string])} onPick={(r) => update({ resolution: r })} />
+          <Chips value={VIDEO_RESOLUTIONS.includes(p.resolution) ? p.resolution : VIDEO_RESOLUTIONS[0]} options={VIDEO_RESOLUTIONS.map((r) => [r, r] as [string, string])} onPick={(r) => update({ resolution: r })} gen />
         </>
       )}
       <div className="ca-gen__label">{video ? t('common.duration') : t('genSettings.count')}</div>
       {video
-        ? <Chips value={p.duration} options={DURATIONS.map((d) => [d, `${d}s`] as [number, string])} onPick={(d) => update({ duration: d })} />
-        : <Chips value={p.count} options={COUNTS.map((n) => [n, String(n)] as [number, string])} onPick={(n) => update({ count: n })} />}
+        ? <Chips value={p.duration} options={DURATIONS.map((d) => [d, `${d}s`] as [number, string])} onPick={(d) => update({ duration: d })} gen />
+        : <Chips value={p.count} options={COUNTS.map((n) => [n, String(n)] as [number, string])} onPick={(n) => update({ count: n })} gen />}
       {video && (
         <>
           <div className="ca-gen__label">{t('genSettings.cameraMotion')}</div>
-          <Chips value={p.style} options={SHOTS.map(([k, label]) => [k, label] as [string, string])} onPick={(s) => update({ style: s })} />
+          <Chips value={p.style} options={SHOTS.map(([k, label]) => [k, label] as [string, string])} onPick={(s) => update({ style: s })} gen />
         </>
       )}
       {!video && (
@@ -114,11 +107,11 @@ export function GenSettings({ p, video, quality, update }: { p: GeneratorShape['
           {quality && (
             <>
               <div className="ca-gen__label">{t('genSettings.quality')}</div>
-              <Chips value={p.quality} options={QUALITIES} onPick={(q) => update({ quality: q })} />
+              <Chips value={p.quality} options={QUALITIES} onPick={(q) => update({ quality: q })} gen />
             </>
           )}
           <div className="ca-gen__label">{t('refModes.style')}</div>
-          <Chips value={p.style} options={STYLES.map(([k, label]) => [k, label] as [string, string])} onPick={(s) => update({ style: s })} />
+          <Chips value={p.style} options={STYLES.map(([k, label]) => [k, label] as [string, string])} onPick={(s) => update({ style: s })} gen />
           <label className="ca-panel__row ca-gen__toggle"><span>{t('genSettings.transparentBackground')}</span><input type="checkbox" checked={p.transparent} onChange={(e) => update({ transparent: e.target.checked })} /></label>
         </>
       )}

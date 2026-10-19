@@ -1,8 +1,24 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 
-from ComfyArt.api import chat_store
+from sqlalchemy import func, select
+
+from ComfyArt.api import chat_store, db
+
+OLD_SCHEMA = """
+CREATE TABLE comfyart_chats (
+    id TEXT PRIMARY KEY, user TEXT NOT NULL, project TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL, resume_token TEXT, run_mode TEXT NOT NULL DEFAULT 'auto',
+    pinned INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, updated_at REAL NOT NULL);
+CREATE INDEX ix_comfyart_chats_user_project ON comfyart_chats (user, project);
+CREATE TABLE comfyart_messages (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
+    chat_id TEXT NOT NULL REFERENCES comfyart_chats (id) ON DELETE CASCADE, parent_id TEXT, role TEXT NOT NULL,
+    blocks TEXT NOT NULL, status TEXT NOT NULL, resume_token_after TEXT, usage TEXT, created_at REAL NOT NULL);
+CREATE INDEX ix_comfyart_messages_chat ON comfyart_messages (chat_id, seq);
+"""
 
 
 def test_chats_are_scoped_by_user_and_project():
@@ -21,8 +37,9 @@ def test_database_lives_in_the_system_user_dir(fresh_user_dir):
 def test_reopen_keeps_owner_and_messages():
     chat = chat_store.create_chat(user="alice", project="p", provider="codex")
     chat_store.create_message(chat_id=chat["id"], role="user", blocks=[{"type": "text", "text": "hi"}])
-    chat_store._conn.close()
-    chat_store._conn = None
+    for engine in db._engines.values():
+        engine.dispose()
+    db._engines.clear()
     reloaded = chat_store.get_chat(chat["id"])
     assert reloaded["user"] == "alice"
     assert chat_store.list_messages(chat["id"])[0]["blocks"][0]["text"] == "hi"
@@ -50,7 +67,23 @@ def test_update_ignores_none_and_delete_cascades_messages():
     assert chat_store.delete_chat(chat["id"]) is True
     assert chat_store.get_chat(chat["id"]) is None
     assert chat_store.list_messages(chat["id"]) == []
-    assert chat_store._db().execute("SELECT COUNT(*) FROM comfyart_messages").fetchone()[0] == 0
+    with db.session() as s:
+        assert s.scalar(select(func.count()).select_from(db.Message)) == 0
+
+
+def test_a_database_from_the_raw_sqlite_version_is_used_as_is(fresh_user_dir):
+    path = fresh_user_dir / "user" / "__comfyart" / "data.db"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.executescript(OLD_SCHEMA)
+    conn.execute("INSERT INTO comfyart_chats (id, user, project, provider, created_at, updated_at) VALUES ('c1', 'alice', 'p', 'codex', 1, 2)")
+    conn.execute("INSERT INTO comfyart_messages (id, chat_id, role, blocks, status, created_at) VALUES ('m1', 'c1', 'user', '[]', 'done', 1)")
+    conn.commit()
+    conn.close()
+    assert chat_store.get_chat("c1")["pinned"] is False
+    chat_store.create_message(chat_id="c1", role="assistant", blocks=[{"type": "text", "text": "ok"}])
+    assert [m["id"] for m in chat_store.list_messages("c1")][0] == "m1"
+    assert chat_store.delete_chat("c1") and chat_store.list_messages("c1") == []
 
 
 def test_abort_unfinished_marks_streaming_and_queued():

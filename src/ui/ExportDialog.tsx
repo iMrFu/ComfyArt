@@ -5,7 +5,8 @@ import { errorText } from '../jobs'
 import { exportPptx } from '../pptx'
 import { download } from '../psd'
 import { exportImage } from '../shapes/ArtboardShape'
-import { Icons } from './icons'
+import { Modal } from './Modal'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 
 export const exportAtom = atom<TLShapeId[] | null>('export', null)
@@ -74,36 +75,26 @@ export function ExportDialog({ editor, onError }: { editor: Editor; onError: (ms
   }
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename">
-        <div className="ca-side__head">
-          <span>{t('exportDialog.exportOptions')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
+    <Modal title={t('exportDialog.exportOptions')} onClose={close}>
+      <div className="ca-rename__body">
+        <div className="ca-chat__hint">{fromSelection ? t('exportDialog.selectedElements', ids.length) : t('exportDialog.wholePage')}</div>
+        <div className="ca-rename__field"><span>{t('exportDialog.format')}</span>
+          <Chips value={format} options={FORMATS} onPick={setFormat} />
         </div>
-        <div className="ca-rename__body">
-          <div className="ca-chat__hint">{fromSelection ? t('exportDialog.selectedElements', ids.length) : t('exportDialog.wholePage')}</div>
-          <div className="ca-rename__field"><span>{t('exportDialog.format')}</span>
-            <div className="ca-panel__chips">
-              {FORMATS.map(([f, label]) => <button key={f} type="button" className="ca-panel__chip" data-on={format === f || undefined} onClick={() => setFormat(f)}>{label}</button>)}
-            </div>
+        {format !== 'svg' && (
+          <div className="ca-rename__field"><span>{t('exportDialog.scale')}</span>
+            <Chips value={scale} options={SCALES.map((s) => [s, `${s}x`] as const)} onPick={setScale} />
           </div>
-          {format !== 'svg' && (
-            <div className="ca-rename__field"><span>{t('exportDialog.scale')}</span>
-              <div className="ca-panel__chips">
-                {SCALES.map((s) => <button key={s} type="button" className="ca-panel__chip" data-on={scale === s || undefined} onClick={() => setScale(s)}>{s}x</button>)}
-              </div>
-            </div>
-          )}
-          {(format === 'png' || format === 'svg') && (
-            <label className="ca-panel__row"><span>{t('exportDialog.includeCanvasBackground')}</span><input type="checkbox" checked={background} onChange={(e) => setBackground(e.target.checked)} /></label>
-          )}
-          <div className="ca-chat__hint">{t('exportDialog.largerSizesTakeLongerTo')}</div>
-          <div className="ca-panel__foot">
-            <button type="button" className="ca-panel__secondary" onClick={close}>{t('common.cancel')}</button>
-            <button type="button" className="ca-panel__primary" disabled={busy} onClick={() => void run()}>{busy ? t('exportDialog.exporting') : t('common.export')}</button>
-          </div>
+        )}
+        {(format === 'png' || format === 'svg') && (
+          <label className="ca-panel__row"><span>{t('exportDialog.includeCanvasBackground')}</span><input type="checkbox" checked={background} onChange={(e) => setBackground(e.target.checked)} /></label>
+        )}
+        <div className="ca-chat__hint">{t('exportDialog.largerSizesTakeLongerTo')}</div>
+        <div className="ca-panel__foot">
+          <button type="button" className="ca-panel__secondary" onClick={close}>{t('common.cancel')}</button>
+          <button type="button" className="ca-panel__primary" disabled={busy} onClick={() => void run()}>{busy ? t('exportDialog.exporting') : t('common.export')}</button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

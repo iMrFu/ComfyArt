@@ -6,6 +6,8 @@ import { errorText, placeMedia, toMedia } from '../jobs'
 import { clipLength, filmstrip, freshEdit, layout, MIN_CLIP, Player, removeClip, splitAt, type Edit, type Subtitle, type TransitionType } from '../videoEdit'
 import { ColorPicker } from './ColorPicker'
 import { Icons } from './icons'
+import { Chips } from './Chips'
+import { useEscape } from './escape'
 import { t } from '../i18n'
 import { uuid } from '../id'
 
@@ -44,6 +46,7 @@ function EditorBody({ editor, shape, src, name, onError }: { editor: Editor; sha
   const [exporting, setExporting] = useState(false)
   const [menu, setMenu] = useState(false)
   const close = () => videoEditorAtom.set(null)
+  useEscape(true, close)
   const toggle = () => {
     const p = player.current
     if (!p) return
@@ -85,8 +88,7 @@ function EditorBody({ editor, shape, src, name, onError }: { editor: Editor; sha
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement | null)?.closest('input, textarea')) return
-      if (e.key === 'Escape') close()
-      else if (e.key === ' ') toggle()
+      if (e.key === ' ') toggle()
       else return
       e.preventDefault()
       e.stopPropagation()
@@ -204,9 +206,7 @@ function EditorBody({ editor, shape, src, name, onError }: { editor: Editor; sha
               <>
                 <div className="ca-gen__title">{t('videoEditor.clip', clipSel + 1)}</div>
                 <div className="ca-gen__label">{t('videoEditor.speed')}</div>
-                <div className="ca-panel__chips">
-                  {SPEEDS.map((v) => <button key={v} type="button" className="ca-panel__chip" data-on={edit.clips[clipSel].speed === v || undefined} onClick={() => setClip(clipSel, { speed: v })}>{v}x</button>)}
-                </div>
+                <Chips value={edit.clips[clipSel].speed} options={SPEEDS.map((v) => [v, `${v}x`] as const)} onPick={(v) => setClip(clipSel, { speed: v })} />
                 <label className="ca-panel__row"><span>{t('videoEditor.volume')}</span><input type="range" min={0} max={200} value={Math.round(edit.clips[clipSel].volume * 100)} onChange={(e) => setClip(clipSel, { volume: Number(e.target.value) / 100 })} /><span className="ca-panel__val">{Math.round(edit.clips[clipSel].volume * 100)}</span></label>
                 <div className="ca-panel__chips">
                   <button type="button" className="ca-panel__chip" onClick={() => setClip(clipSel, { volume: edit.clips[clipSel].volume ? 0 : 1 })}>{edit.clips[clipSel].volume ? t('videoEditor.mute') : t('videoEditor.unmute')}</button>
@@ -217,9 +217,7 @@ function EditorBody({ editor, shape, src, name, onError }: { editor: Editor; sha
             {trSel !== null && (
               <>
                 <div className="ca-gen__title">{t('videoEditor.transition')}</div>
-                <div className="ca-panel__chips">
-                  {TRANSITIONS.map(([t, label]) => <button key={t} type="button" className="ca-panel__chip" data-on={edit.transitions[trSel].type === t || undefined} onClick={() => commit({ ...edit, transitions: edit.transitions.map((x, j) => (j === trSel ? { ...x, type: t } : x)) })}>{label}</button>)}
-                </div>
+                <Chips value={edit.transitions[trSel].type} options={TRANSITIONS} onPick={(t) => commit({ ...edit, transitions: edit.transitions.map((x, j) => (j === trSel ? { ...x, type: t } : x)) })} />
                 <label className="ca-panel__row"><span>{t('common.duration')}</span><input type="range" min={2} max={20} value={Math.round(edit.transitions[trSel].duration * 10)} onChange={(e) => commit({ ...edit, transitions: edit.transitions.map((x, j) => (j === trSel ? { ...x, duration: Number(e.target.value) / 10 } : x)) })} /><span className="ca-panel__val">{edit.transitions[trSel].duration.toFixed(1)}s</span></label>
                 <button type="button" className="ca-panel__chip" onClick={() => commit({ ...edit, transitions: edit.transitions.map((x) => ({ ...x, type: edit.transitions[trSel].type, duration: edit.transitions[trSel].duration })) })}>{t('videoEditor.applyToAllTransitions')}</button>
               </>

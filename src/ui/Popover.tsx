@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useEscape } from './escape'
 
 const GAP = 8
 const EDGE = 8
@@ -36,14 +37,10 @@ export function Popover({ trigger, children, side = 'bottom', align = 'start', o
       if (panel.current?.contains(t) || anchor.current?.contains(t) || (t as Element).closest?.('.ca-pop')) return
       onOpenChange(false)
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onOpenChange(false) }
     document.addEventListener('pointerdown', onDown, true)
-    document.addEventListener('keydown', onKey, true)
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true)
-      document.removeEventListener('keydown', onKey, true)
-    }
+    return () => document.removeEventListener('pointerdown', onDown, true)
   }, [open, onOpenChange])
+  useEscape(open, () => onOpenChange(false))
 
   useEffect(() => { if (!open) setPos(null) }, [open])
 

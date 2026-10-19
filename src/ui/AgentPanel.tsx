@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { atom, useValue, type Editor, type TLImageShape } from 'tldraw'
+import { atom, useValue, type Editor, type TLShapeId } from 'tldraw'
 
-import { draftAtom, sendToAgent, uploadRefs } from '../agent'
+import { draftAtom, isRefShape, sendToAgent, uploadRefs, type RefShape } from '../agent'
 import { botEnabledAtom, branchFrom, chatIdAtom, chatsAtom, deleteChat, messagesAtom, openChat, providersAtom, stopTurn, type BotMessage } from '../bot'
+import { chatFrameOf, locateChatFrame } from '../chatFrame'
 import { errorText } from '../jobs'
 import { libraryAtom } from '../library'
 import { loadSkills } from '../skills'
@@ -11,21 +12,21 @@ import { dockAtom } from './chatDock'
 import { libraryTabAtom } from './LibraryPanel'
 import { sideAtom } from './SidePanel'
 import { AssistantBlocks, textOf, UserMessage } from './ChatMessage'
-import { Composer } from './Composer'
+import { Composer, FILE_ACCEPT } from './Composer'
 import { Icons } from './icons'
 import { NoticeCenter } from './NoticeCenter'
 import { Popover } from './Popover'
 import { ProjectHeader } from './ProjectHeader'
 import { detailsAtom } from './TaskDetails'
+import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
-import { copyText } from '../clipboard'
 
 const NEAR_BOTTOM = 80
 
 function pickFiles(use: (files: File[]) => void) {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = 'image/*'
+  input.accept = FILE_ACCEPT
   input.multiple = true
   input.onchange = () => use(Array.from(input.files ?? []))
   input.click()
@@ -71,10 +72,10 @@ function History({ onError }: { onError: (msg: string) => void }) {
   )
 }
 
-function imagesOf(editor: Editor, m: BotMessage): TLImageShape[] {
+function refsOf(editor: Editor, m: BotMessage): RefShape[] {
   return m.blocks.flatMap((b) => {
-    const shape = b.type === 'image' && b.shape ? editor.getShape(b.shape as TLImageShape['id']) : undefined
-    return shape?.type === 'image' ? [shape as TLImageShape] : []
+    const shape = b.shape ? editor.getShape(b.shape as TLShapeId) : undefined
+    return shape && isRefShape(shape) ? [shape] : []
   })
 }
 
@@ -82,7 +83,8 @@ async function resend(editor: Editor, m: BotMessage) {
   const skillName = m.blocks.find((b) => b.type === 'skill')?.name
   const skill = skillName ? (await loadSkills()).find((s) => s.name === skillName) ?? null : null
   const kits = libraryAtom.get().filter((k) => m.blocks.some((b) => b.type === 'kit' && b.name === k.name))
-  await sendToAgent(editor, textOf(m), imagesOf(editor, m), skill, kits)
+  const docs = m.blocks.filter((b) => b.type === 'file' && b.url).map((b) => ({ src: b.url!, name: b.name ?? '' }))
+  await sendToAgent(editor, textOf(m), refsOf(editor, m), skill, kits, docs)
 }
 
 export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError }: {
@@ -98,6 +100,7 @@ export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError 
   const providers = useValue(providersAtom)
   const enabled = useValue(botEnabledAtom)
   const dock = useValue(dockAtom)
+  const hasFrame = useValue('chat frame', () => !!(chat && chatFrameOf(editor, chat.id, true)), [editor, chat?.id])
   const list = useRef<HTMLDivElement>(null)
   const busy = !!chat?.busy
   const canBranch = providers.find((p) => p.id === chat?.provider)?.branch ?? false
@@ -134,6 +137,11 @@ export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError 
           </button>
           <History onError={onError} />
         </div>
+        {chat && hasFrame && (
+          <button type="button" className="ca-bar__btn ca-bar__btn--icon" title={t('chatFrame.locateFrame')} onClick={() => locateChatFrame(editor, chat.id)}>
+            <span className="ca-icon">{Icons.frame}</span>
+          </button>
+        )}
         <NoticeCenter editor={editor} />
         <button type="button" className="ca-bar__btn ca-bar__btn--icon ca-wide-only" title={max ? t('agentPanel.restoreChat') : t('agentPanel.maximizeChat')} data-on={max || undefined} onClick={onMax}>
           <span className="ca-icon">{Icons.expandPanel}</span>
@@ -180,7 +188,7 @@ export function AgentPanel({ editor, projectId, max, onMax, onCollapse, onError 
                   {!busy && i === messages.length - 1 && lastUser === i - 1 && (
                     <button type="button" className="ca-history__del" title={t('common.regenerate')} onClick={() => void resend(editor, messages[i - 1]).catch(fail)}>{Icons.replace}</button>
                   )}
-                  <button type="button" className="ca-history__del" title={t('common.copy')} onClick={() => void copyText(textOf(m))}>{Icons.page}</button>
+                  <CopyButton text={textOf(m)} />
                   <button type="button" className="ca-history__del" title={t('agentPanel.taskDetails')} onClick={() => detailsAtom.set(m.id)}>{Icons.files}</button>
                 </div>
               )}

@@ -29,7 +29,13 @@ Documentation with screenshots for every feature: **[comfyart.org](https://comfy
 
 Put this folder in `ComfyUI/custom_nodes/`, install the Python requirements into ComfyUI's environment (`pip install -r requirements.txt`: `pypdfium2` for PDF uploads and `rapidocr` for Edit Elements), restart ComfyUI and open `http://127.0.0.1:8188/comfyart/`. The built page is in `dist/`; after changing `src/`, rebuild with `npm install && npm run build`.
 
-Projects are saved to the ComfyUI user directory under `comfyart/projects/`. The interface starts in ComfyUI's language and can be switched from the settings menu.
+Projects, their snapshot history and agent chats are saved in a SQLite database, `user/__comfyart/data.db`. Projects from older versions (JSON files under `comfyart/projects/`) are imported automatically the first time you open ComfyArt; the files are left in place. The interface starts in ComfyUI's language and can be switched from the settings menu.
+
+## Comfy Cloud
+
+ComfyArt can run its workflows on [Comfy Cloud](https://cloud.comfy.org) instead of the local GPU. Create an API key at [platform.comfy.org](https://platform.comfy.org/profile/api-keys) (Cloud API keys need a paid Comfy plan), set it as `COMFY_API_KEY` before starting ComfyUI, then choose Settings → Generate on → Comfy Cloud. The same workflows are sent to `https://cloud.comfy.org/api/v2/jobs`; no build or deployment is needed because Cloud has the models and nodes preinstalled. Input images and audio are uploaded as Cloud assets when a job is submitted, and results are downloaded into `output/comfyart/` with a `cloud-<job>` suffix, so the canvas, history and Agent see them like local results.
+
+On Cloud, FLUX.2 Klein 9B runs the bf16 `flux-2-klein-9b.safetensors` and Qwen Image 2512 loads with the core `UNETLoader`. Angles imports the QMA LoRA from Hugging Face into your Cloud model library the first time it runs. Voiceover and voice cloning use Qwen3-TTS on Cloud (`speech-qwen3tts`, `voice-clone-qwen3tts`) instead of Kokoro and IndexTTS2, which Cloud does not have.
 
 ## Agent
 
@@ -44,6 +50,17 @@ The Agent panel runs a real tool-using agent on the backend, ported from [ComfyT
 | Local LLM | any OpenAI-compatible endpoint with tool calling (Agent Settings → Local LLM URL); set `COMFYART_LOCAL_LLM_API_KEY` before starting ComfyUI if it needs a key |
 
 Storyboard split, OCR, brand and memory extraction, reference notes and the Ideogram caption are single calls to the default Agent (`POST /comfyart/bot/complete`, no tools). ComfyArt never stores credentials. The agent works through the ComfyArt MCP server at `POST /comfyart/mcp` (look at the canvas, generate and edit images, videos, audio and 3D models, Edit Elements and mockups, place text, shapes, frames, web pages and slides, memory, skills, ask the user). Canvas tools are executed by the open ComfyArt tab of the project, so keep it open while the agent works. Chats are saved in a SQLite database at `user/__comfyart/data.db` and keep running when the panel is closed.
+
+### Use ComfyArt from other agents
+
+Turn on MCP in Agent Settings and add `http://127.0.0.1:8188/comfyart/mcp?project=<project-id>` to any MCP client, for example:
+
+```bash
+claude mcp add --transport http comfyart "http://127.0.0.1:8188/comfyart/mcp?project=<project-id>"
+codex mcp add comfyart --url "http://127.0.0.1:8188/comfyart/mcp?project=<project-id>"
+```
+
+Setup for Claude Code, Codex, Gemini CLI, Qwen Code, Cursor, VS Code, Claude Desktop and your own scripts, tool timeouts and the full tool list are in the [MCP guide](https://comfyart.org/guides/mcp).
 
 ## Workflows and models
 
@@ -77,6 +94,7 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 
 - `ComfyArt Precise UNET Loader` loads a diffusion model with manual cast ops. ComfyUI's `--fast fp8_matrix_mult` turns unscaled fp8 checkpoints such as Qwen Image 2512 into noise; this loader skips that path for the model it loads.
 - `/comfyart/bot/*` (chats, send, stop, branch, answers), `/comfyart/settings` and `/comfyart/mcp` serve the Agent.
+- `POST /comfyart/cloud/prompt`, `GET /comfyart/cloud/history/{job}` and `POST /comfyart/cloud/cancel/{job}` forward jobs to Comfy Cloud with `COMFY_API_KEY`.
 - `POST /comfyart/pdf` renders up to 30 pages of an uploaded PDF to PNG files in `input/comfyart/pdf/` and returns them with each page's text.
 - `POST /comfyart/ocr` reads the text lines of an image (RapidOCR, on device) and returns each line with its box.
 

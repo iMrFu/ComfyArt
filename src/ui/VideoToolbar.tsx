@@ -2,14 +2,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useEditor, type TLVideoShape } from 'tldraw'
 
 import * as actions from '../actions'
-import { DURATIONS, genInfoOf, remix } from '../generate'
-import { VIDEO_TARGETS } from '../workflows'
+import { genInfoOf, remix } from '../generate'
+import { DURATIONS } from '../genOptions'
+import { VIDEO_TARGETS } from '../videoGraphs'
 import { Icons } from './icons'
 import { Popover } from './Popover'
 import { useElementSize, useOnlySelected, useSelectionRect, type ScreenRect } from './selection'
 import { videoEditorAtom } from './VideoEditor'
 import { t } from '../i18n'
 import { isEnter } from './keys'
+import { useEscape } from './escape'
 
 const GAP = 22
 const EDGE = 8
@@ -81,12 +83,7 @@ export function VideoToolbar({ onError }: { onError: Err }) {
 
   useEffect(() => setMode(null), [shape?.id])
 
-  useEffect(() => {
-    if (!mode) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setMode(null) } }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [mode])
+  useEscape(!!mode, () => setMode(null))
 
   if (!shape || !rect) return null
   const asset = shape.props.assetId ? editor.getAsset(shape.props.assetId) : null

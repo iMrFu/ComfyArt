@@ -1,7 +1,7 @@
 from server import PromptServer
 
 from .. import chat_store
-from . import bot_tools, canvas
+from . import bot_tools, canvas, media
 from ._context import BOT_CHAT_ID, PROJECT
 
 
@@ -23,4 +23,5 @@ TOOLS: dict[str, dict] = {
     },
 }
 TOOLS.update(canvas.TOOLS)
+TOOLS.update(media.TOOLS)
 TOOLS.update(bot_tools.TOOLS)

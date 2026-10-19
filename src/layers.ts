@@ -5,6 +5,7 @@ import { queuePrompt, uploadImage, viewUrl, waitForImages } from './comfy'
 import { type ErrorSink, errorText, type Media, placeMedia, registerPlacer, selectResults, spawnHolder, startJob } from './jobs'
 import { annotated, eraseGraph, samBoxesGraph } from './workflows'
 import { t } from './i18n'
+import { canvasBlob } from './canvasBlob'
 
 const SOLID = 200
 const OPAQUE = 128
@@ -94,9 +95,7 @@ export async function cropLayer(data: Uint8ClampedArray, w: number, h: number) {
   out.width = r - l + 1
   out.height = b - t + 1
   out.getContext('2d')!.drawImage(canvasOf(data, w, h), l, t, out.width, out.height, 0, 0, out.width, out.height)
-  const blob = await new Promise<Blob | null>((res) => out.toBlob(res, 'image/png'))
-  if (!blob) return null
-  const ref = await uploadImage(blob, `layer-${Date.now()}.png`)
+  const ref = await uploadImage(await canvasBlob(out), `layer-${Date.now()}.png`)
   return { media: { ref, src: viewUrl(ref), w: out.width, h: out.height, kind: 'image' } as Media, x: l, y: t }
 }
 

@@ -5,8 +5,10 @@ import { queuePrompt, uploadImage, viewUrl, waitForImages } from './comfy'
 import type { CommentShape } from './shapes/CommentShape'
 import { resultsAtom, spawnHolder, startJob, type ErrorSink, type MediaKind } from './jobs'
 import { notify } from './notices'
-import { animateGraph, annotated, anglesGraph, creativeUpscaleGraph, cutoutGraph, cutoutVideoGraph, editGraph, eraseGraph, expandGraph, extendGraph, layersGraph, moveGraph, samGraph, styleGraph, upscaleVideoGraph, touchGraph, upscaleGraph, type Built, type Crop } from './workflows'
+import { annotated, anglesGraph, creativeUpscaleGraph, cutoutGraph, editGraph, eraseGraph, expandGraph, layersGraph, moveGraph, samGraph, styleGraph, touchGraph, upscaleGraph, type Built, type Crop } from './workflows'
+import { animateGraph, cutoutVideoGraph, extendGraph, upscaleVideoGraph } from './videoGraphs'
 import { t } from './i18n'
+import { canvasBlob } from './canvasBlob'
 
 export interface Pads { l: number; t: number; r: number; b: number }
 export interface Stroke { points: [number, number][]; r: number }
@@ -107,9 +109,7 @@ export async function maskFile(w: number, h: number, paint: (ctx: CanvasRenderin
   ctx.fillRect(0, 0, w, h)
   ctx.globalCompositeOperation = 'destination-out'
   paint(ctx)
-  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'))
-  if (!blob) throw new Error('mask export failed')
-  const ref = await uploadImage(blob, `mask-${Date.now()}.png`)
+  const ref = await uploadImage(await canvasBlob(c), `mask-${Date.now()}.png`)
   return `${ref.subfolder ? `${ref.subfolder}/` : ''}${ref.filename} [${ref.type}]`
 }
 

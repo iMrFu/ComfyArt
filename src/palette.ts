@@ -1,3 +1,5 @@
+import { canvasBlob } from './canvasBlob'
+
 const NAMES: [string, number, number, number][] = [
   ['black', 0, 0, 0], ['charcoal', 54, 69, 79], ['dark gray', 80, 80, 80], ['gray', 128, 128, 128], ['silver', 192, 192, 192],
   ['light gray', 224, 224, 224], ['off-white', 245, 245, 240], ['white', 255, 255, 255], ['cream', 255, 253, 208], ['beige', 232, 220, 190],
@@ -46,7 +48,7 @@ export async function paletteImage(colors: string[]): Promise<Blob> {
       ctx.fillRect(x * tile, y * tile, tile, tile)
     }
   }
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('palette render failed'))), 'image/png'))
+  return canvasBlob(canvas)
 }
 
 export const alphaOf = (color: string) => (color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1)

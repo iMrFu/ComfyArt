@@ -11,6 +11,7 @@ import type { GeneratorShape } from '../shapes/GeneratorShape'
 import { AssetGrid } from './AssetPicker'
 import { Icons } from './icons'
 import { Popover } from './Popover'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 import { uuid } from '../id'
 import { isEnter } from './keys'
@@ -149,13 +150,9 @@ export function ReferencePanel({ editor, onError }: { editor: Editor; onError: E
       </div>
       {refs.length > 0 && (
         <div className="ca-style__row">
-          <div className="ca-panel__chips">
-            {SOURCES.map(([k, label]) => <button key={k} type="button" className="ca-panel__chip" data-on={source === k || undefined} onClick={() => setSource(k)}>{label}</button>)}
-          </div>
+          <Chips value={source} options={SOURCES} onPick={setSource} />
           <span className="ca-menu__grow" />
-          <div className="ca-panel__chips">
-            {SORTS.map(([k, label]) => <button key={k} type="button" className="ca-panel__chip" data-on={sort === k || undefined} onClick={() => setSort(k)}>{label}</button>)}
-          </div>
+          <Chips value={sort} options={SORTS} onPick={setSort} />
         </div>
       )}
       {refs.length === 0 && <div className="ca-side__empty">{t('referencePanel.startFromReferencesUploadImages')}</div>}

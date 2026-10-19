@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
 
-import { agentModeAtom, directSettingsAtom, draftAtom, extraRefsAtom, generateDirect, kitsAtom, sendToAgent, srcOf, uploadRefs, type AgentMode, type DirectSettings, type RefShape } from '../agent'
+import { agentModeAtom, directSettingsAtom, DOC_ACCEPT, docsAtom, draftAtom, eachLine, eachRuns, extraRefsAtom, generateDirect, isRefShape, kitsAtom, refKindOf, sendToAgent, srcOf, uploadRefs, type AgentMode, type DirectSettings, type RefShape } from '../agent'
+import { EachButton, EachRole, useEach } from './EachToggle'
+import { RefFrameButton } from './RefFrameButton'
 import { placeAsset } from '../assets'
 import { botEnabledAtom, messagesAtom } from '../bot'
-import { VIDEO_RATIOS } from '../generate'
+import { VIDEO_RATIOS } from '../genOptions'
 import { errorText } from '../jobs'
 import { KIND_LABELS, libraryAtom } from '../library'
 import { agentModels, installedModels, modelOf } from '../models'
 import { GENERATOR, type GeneratorShape, type GeneratorShapeUtil } from '../shapes/GeneratorShape'
+import type { AudioShape } from '../shapes/EmbedShapes'
 import { loadSkills, saveSkill, skillAtom, type Skill } from '../skills'
 import { AssetGrid } from './AssetPicker'
 import { ModelPill, SettingsPill } from './GenSettings'
@@ -17,7 +20,7 @@ import { AgentPicker } from './AgentPicker'
 import { Icons } from './icons'
 import { ModelPrefs } from './ModelPrefs'
 import { VoiceButton } from './VoiceButton'
-import { skillsOpenAtom } from './SkillsDialog'
+import { SkillForm, skillsOpenAtom } from './SkillsDialog'
 import { Popover } from './Popover'
 import { t } from '../i18n'
 import { uuid } from '../id'
@@ -27,34 +30,19 @@ const MODES: [AgentMode, string, keyof typeof Icons][] = [['agent', 'Agent', 'ag
 const REVIEW_PROMPT = t('composer.canvasReviewUseGetCanvas')
 const SKILL_PROMPT = t('composer.turnTheApproachCompletedIn')
 
-const isRef = (s: { type: string }): s is RefShape => s.type === 'image' || s.type === 'video'
+export const FILE_ACCEPT = `image/*,video/*,audio/*,${DOC_ACCEPT}`
 
 function imageName(editor: Editor, s: RefShape) {
-  const asset = s.props.assetId ? editor.getAsset(s.props.assetId) : null
-  return (asset?.type === s.type && asset.props.name) || (s.type === 'video' ? t('common.video') : t('common.image'))
+  if (refKindOf(s) === 'audio') return (s as AudioShape).props.name || t('composer.audio')
+  const v = s as Exclude<RefShape, AudioShape>
+  const asset = v.props.assetId ? editor.getAsset(v.props.assetId) : null
+  return (asset?.type === v.type && asset.props.name) || (v.type === 'video' ? t('common.video') : t('common.image'))
 }
 
-function SkillEditor({ onDone }: { onDone: (s: Skill | null) => void }) {
-  const [name, setName] = useState('')
-  const [text, setText] = useState('')
-  return (
-    <div className="ca-menu ca-skilled">
-      <div className="ca-gen__title">{t('composer.skillCreator')}</div>
-      <input className="ca-panel__input" value={name} placeholder={t('composer.skillName')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-      <textarea className="ca-panel__prompt ca-panel__prompt--boxed" value={text} placeholder={t('composer.instructionsForTheAgentDeliverables')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-      <div className="ca-panel__foot">
-        <button type="button" className="ca-panel__secondary" onClick={() => onDone(null)}>{t('common.cancel')}</button>
-        <button
-          type="button"
-          className="ca-panel__primary"
-          disabled={!name.trim() || !text.trim()}
-          onClick={() => onDone({ id: uuid().slice(0, 8), name: name.trim(), instructions: text.trim(), custom: true })}
-        >
-          {t('common.save')}
-        </button>
-      </div>
-    </div>
-  )
+function RefThumb({ editor, s }: { editor: Editor; s: RefShape }) {
+  const kind = refKindOf(s)
+  if (kind === 'audio') return <span className="ca-icon">{Icons.music}</span>
+  return kind === 'video' ? <video src={srcOf(editor, s) ?? ''} muted preload="metadata" /> : <img src={srcOf(editor, s) ?? ''} alt="" />
 }
 
 function DirectPills({ editor, video }: { editor: Editor; video: boolean }) {
@@ -86,16 +74,18 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
   const extra = useValue(extraRefsAtom)
   const kits = useValue(kitsAtom)
   const library = useValue(libraryAtom)
-  const selected = useValue('selected media', () => editor.getSelectedShapes().filter(isRef), [editor])
-  const images = useValue('canvas media', () => editor.getCurrentPageShapes().filter(isRef), [editor])
+  const docs = useValue(docsAtom)
+  const selected = useValue('selected media', () => editor.getSelectedShapes().filter(isRefShape), [editor])
+  const images = useValue('canvas media', () => editor.getCurrentPageShapes().filter(isRefShape), [editor])
   const [menu, setMenu] = useState<'plus' | 'skills' | 'assets' | 'mode' | 'create' | null>(null)
   const [skills, setSkills] = useState<Skill[]>([])
   const file = useRef<HTMLInputElement>(null)
   const [hidden, setHidden] = useState<TLShapeId[]>([])
   const [drop, setDrop] = useState(false)
+  const each = useEach()
 
   const shown = selected.filter((s) => !hidden.includes(s.id))
-  const refs = [...shown, ...extra.map((id) => editor.getShape(id)).filter((s): s is RefShape => !!s && isRef(s) && !shown.some((x) => x.id === s.id))]
+  const refs = [...shown, ...extra.map((id) => editor.getShape(id)).filter((s): s is RefShape => !!s && isRefShape(s) && !shown.some((x) => x.id === s.id))]
   const slash = /^\/(\S*)$/.exec(draft)
   const at = /(?:^|\s)@(\S*)$/.exec(draft)
 
@@ -119,15 +109,22 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
 
   const fail = (e: unknown) => onError(errorText(e))
   const upload = (files: FileList | null) => uploadRefs(editor, Array.from(files ?? [])).catch(fail)
-  const imageFiles = (list: DataTransfer) => Array.from(list.files).filter((f) => f.type.startsWith('image/'))
+  const imageFiles = (list: DataTransfer) => Array.from(list.files)
   const send = () => {
     const text = draft.trim()
     if (!text || agentOff) return
     draftAtom.set('')
     extraRefsAtom.set([])
     kitsAtom.set([])
-    if (mode === 'agent') skillAtom.set(null)
-    void (mode === 'agent' ? sendToAgent(editor, text, refs, skill, kits) : generateDirect(editor, text, refs, mode === 'video', onError)).catch(fail)
+    if (mode === 'agent') {
+      skillAtom.set(null)
+      docsAtom.set([])
+    }
+    const targets = refs.length > 1 ? each.targets(refs) : []
+    each.reset()
+    void (mode === 'agent'
+      ? sendToAgent(editor, text, refs, skill, kits, docs, targets.length ? eachLine(refs, targets) : '')
+      : generateDirect(editor, text, eachRuns(refs, targets, () => text), mode === 'video', onError)).catch(fail)
   }
 
   const filtered = slash ? skills.filter((s) => s.name.includes(slash[1])) : skills
@@ -163,12 +160,12 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           ))}
           {mentions.map((s) => (
             <button key={s.id} type="button" className="ca-menu__item" onClick={() => { addRef(s.id); clearAt() }}>
-              {s.type === 'video' ? <span className="ca-icon">{Icons.video}</span> : <img className="ca-composer__mini" src={srcOf(editor, s) ?? ''} alt="" />}<span className="ca-menu__grow">{imageName(editor, s)}</span>
+              {s.type === 'image' ? <img className="ca-composer__mini" src={srcOf(editor, s) ?? ''} alt="" /> : <span className="ca-icon">{s.type === 'video' ? Icons.video : Icons.music}</span>}<span className="ca-menu__grow">{imageName(editor, s)}</span>
             </button>
           ))}
         </div>
       )}
-      {(refs.length > 0 || skill || kits.length > 0) && (
+      {(refs.length > 0 || skill || kits.length > 0 || (mode === 'agent' && docs.length > 0)) && (
         <div className="ca-composer__chips">
           {kits.map((k) => (
             <span key={k.id} className="ca-chip">
@@ -182,10 +179,17 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
               <button type="button" title={t('common.remove')} onClick={() => skillAtom.set(null)}>{Icons.close}</button>
             </span>
           )}
+          {mode === 'agent' && docs.map((d) => (
+            <span key={d.src} className="ca-chip" title={d.name}>
+              <span className="ca-icon">{Icons.page}</span><span className="ca-chip__name">{d.name}</span>
+              <button type="button" title={t('common.remove')} onClick={() => docsAtom.set(docs.filter((x) => x.src !== d.src))}>{Icons.close}</button>
+            </span>
+          ))}
           {refs.map((r) => (
-            <span key={r.id} className="ca-chip ca-chip--image">
-              {r.type === 'video' ? <video src={srcOf(editor, r) ?? ''} muted preload="metadata" /> : <img src={srcOf(editor, r) ?? ''} alt="" />}
+            <span key={r.id} className="ca-chip ca-chip--image" data-audio={refKindOf(r) === 'audio' || undefined} title={imageName(editor, r)}>
+              <RefThumb editor={editor} s={r} />
               <button type="button" title={t('common.remove')} onClick={() => removeRef(r.id)}>{Icons.close}</button>
+              {each.on && refs.length > 1 && <EachRole shared={each.isShared(r.id)} onToggle={() => each.toggleShared(r.id)} />}
             </span>
           ))}
         </div>
@@ -205,7 +209,7 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
         }}
       />
       <div className="ca-composer__foot">
-        <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = '' }} />
+        <input ref={file} type="file" accept={FILE_ACCEPT} multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = '' }} />
         <Popover
           open={menu === 'plus' || menu === 'skills' || menu === 'assets' || menu === 'create'}
           onOpenChange={(o) => setMenu(o ? 'plus' : null)}
@@ -263,13 +267,17 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
             </div>
           )}
           {menu === 'create' && (
-            <SkillEditor
-              onDone={(s) => {
-                setMenu(null)
-                if (!s) return
-                void saveSkill(s).then(() => skillAtom.set(s)).catch((e) => onError(String(e)))
-              }}
-            />
+            <div className="ca-menu ca-skilled">
+              <div className="ca-gen__title">{t('composer.skillCreator')}</div>
+              <SkillForm
+                initial={{ id: uuid().slice(0, 8), name: '', instructions: '', custom: true }}
+                onDone={(s) => {
+                  setMenu(null)
+                  if (!s) return
+                  void saveSkill(s).then(() => skillAtom.set(s)).catch((e) => onError(String(e)))
+                }}
+              />
+            </div>
           )}
         </Popover>
         <Popover
@@ -292,7 +300,9 @@ export function Composer({ editor, busy, onError }: { editor: Editor; busy: bool
           </div>
         </Popover>
         {mode !== 'agent' && <DirectPills editor={editor} video={mode === 'video'} />}
+        {refs.length > 1 && <EachButton compact on={each.on} onChange={each.setOn} />}
         {mode === 'agent' && !agentOff && <AgentPicker onError={onError} />}
+        {mode === 'agent' && !agentOff && <RefFrameButton editor={editor} />}
         {mode === 'agent' && <ModelPrefs onError={onError} />}
         <div className="ca-gen__spacer" />
         <VoiceButton onError={onError} onText={(t) => draftAtom.set(`${draftAtom.get()}${draftAtom.get() ? ' ' : ''}${t}`)} />

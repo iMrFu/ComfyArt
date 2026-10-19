@@ -8,18 +8,11 @@ import { chatViewAtom } from './AgentPanel'
 import { Icons } from './icons'
 import { Popover } from './Popover'
 import { reveal } from './TaskDetails'
-import { t } from '../i18n'
+import { Chips } from './Chips'
+import { t, timeAgo } from '../i18n'
 
 const FILTERS: [NoticeKind | 'all', string][] = [['all', t('common.all')], ['task', t('noticeCenter.tasks')], ['suggestion', t('noticeCenter.suggestions')], ['comment', t('common.comment')], ['schedule', t('noticeCenter.scheduled')]]
 const KIND_ICONS: Record<NoticeKind, keyof typeof Icons> = { task: 'genImage', suggestion: 'agent', comment: 'comment', schedule: 'bell' }
-
-function ago(time: number) {
-  const m = Math.floor((Date.now() - time) / 60000)
-  if (m < 1) return t('historyDialog.justNow')
-  if (m < 60) return t('historyDialog.minAgo', m)
-  if (m < 1440) return t('noticeCenter.hAgo', Math.floor(m / 60))
-  return new Date(time).toLocaleDateString()
-}
 
 export function NoticeCenter({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false)
@@ -57,9 +50,7 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
           {unread > 0 && <button type="button" className="ca-panel__chip" onClick={() => void markRead()}>{t('noticeCenter.markAllAsRead')}</button>}
           {notices.length > 0 && <button type="button" className="ca-panel__chip" onClick={() => void clearNotices()}>{t('noticeCenter.clear')}</button>}
         </div>
-        <div className="ca-panel__chips">
-          {FILTERS.map(([k, label]) => <button key={k} type="button" className="ca-panel__chip" data-on={filter === k || undefined} onClick={() => setFilter(k)}>{label}</button>)}
-        </div>
+        <Chips value={filter} options={FILTERS} onPick={setFilter} />
         <div className="ca-notice__list">
           {shown.length === 0 && <div className="ca-menu__empty">{t('noticeCenter.noNotifications')}</div>}
           {shown.map((n) => (
@@ -68,7 +59,7 @@ export function NoticeCenter({ editor }: { editor: Editor }) {
               <div className="ca-menu__grow ca-notice__text">
                 <div className="ca-notice__title">{n.title}</div>
                 {n.body && <div className="ca-notice__body">{n.body}</div>}
-                <div className="ca-chat__hint">{ago(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
+                <div className="ca-chat__hint">{timeAgo(n.time)}{n.project !== currentProject() ? t('noticeCenter.otherProject') : ''}</div>
               </div>
               {n.srcs?.[0] && (/\.(mp4|webm|mov)(&|$)/.test(n.srcs[0])
                 ? <video className="ca-notice__thumb" src={n.srcs[0]} muted preload="metadata" />

@@ -4,7 +4,7 @@ import { deleteUserFile, listUserFiles, readUserText, uploadImage, viewUrl, writ
 import { t } from './i18n'
 import { uuid } from './id'
 
-export interface Skill { id: string; name: string; instructions: string; files?: Record<string, string>; images?: Record<string, string>; custom?: boolean }
+export interface Skill { id: string; name: string; instructions: string; files?: Record<string, string>; images?: Record<string, string>; custom?: boolean; learned?: string[] }
 export interface SkillVersion { time: number; skill: Skill }
 
 const ROOT = 'comfyart/skills'
@@ -48,7 +48,8 @@ async function readSkill(id: string, paths: string[]): Promise<Skill | null> {
   const files: Record<string, string> = {}
   for (const p of paths.filter((p) => p.startsWith('files/'))) files[p.slice(6)] = (await read(`${id}/${p}`)) ?? ''
   const images = paths.includes('images.json') ? JSON.parse((await read(`${id}/images.json`)) ?? '{}') as Record<string, string> : {}
-  return { id, name: name || id, instructions, files, images, custom: true }
+  const learned = paths.includes('learned.json') ? JSON.parse((await read(`${id}/learned.json`)) ?? '[]') as string[] : undefined
+  return { id, name: name || id, instructions, files, images, custom: true, ...(learned ? { learned } : {}) }
 }
 
 export async function loadSkills(): Promise<Skill[]> {
@@ -68,6 +69,7 @@ export async function saveSkill(skill: Skill) {
   const files = skill.files ?? {}
   await write(`${skill.id}/SKILL.md`, toMarkdown(skill))
   await write(`${skill.id}/images.json`, JSON.stringify(skill.images ?? {}))
+  if (skill.learned) await write(`${skill.id}/learned.json`, JSON.stringify(skill.learned))
   for (const [path, content] of Object.entries(files)) await write(`${skill.id}/files/${path}`, content)
   for (const p of paths.filter((p) => p.startsWith('files/') && !(p.slice(6) in files))) await remove(`${skill.id}/${p}`)
 }
@@ -86,7 +88,7 @@ export async function listVersions(id: string): Promise<SkillVersion[]> {
   return out
 }
 
-const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '') || uuid().slice(0, 8)
+export const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '') || uuid().slice(0, 8)
 
 export async function uploadSkillImage(file: File, id: string): Promise<string> {
   return viewUrl(await uploadImage(file, `skill-${id}-${file.name}`))

@@ -7,7 +7,7 @@ import { errorText } from '../jobs'
 import { COLOR_ROLES, KIND_LABELS, libraryAtom, saveLibrary, type FontFile, type LibraryItem } from '../library'
 import { ask, parseJson } from '../llm'
 import { isPdf, uploadPdf } from '../pdf'
-import { openProject, newProjectId } from '../projects'
+import { newProject } from '../projects'
 import { AssetGrid } from './AssetPicker'
 import { ColorPicker } from './ColorPicker'
 import { confirmAtom } from './Confirm'
@@ -139,6 +139,7 @@ export function KitEditor({ onError }: { onError: (msg: string) => void }) {
   }
   const removeFont = (family: string) => update((x) => ({ ...x, fonts: x.fonts.filter((f) => f !== family), fontFiles: (x.fontFiles ?? []).filter((f) => f.family !== family) }))
   const remove = () => confirmAtom.set({
+    danger: true,
     title: t('libraryPanel.deleteItem', KIND_LABELS[item.kind]),
     desc: t('libraryPanel.itemWillBeRemoved', item.name || t('kitEditor.untitled', KIND_LABELS[item.kind])),
     ok: t('common.delete'),
@@ -264,7 +265,7 @@ export function KitEditor({ onError }: { onError: (msg: string) => void }) {
       </div>
       {brand && (
         <div className="ca-kit__foot">
-          <button type="button" className="ca-panel__primary ca-kit__cta" onClick={() => { flush(); openProject(newProjectId(), item.id) }}>{t('kitEditor.createProject')} →</button>
+          <button type="button" className="ca-panel__primary ca-kit__cta" onClick={() => { flush(); newProject({ kit: item.id }) }}>{t('kitEditor.createProject')} →</button>
         </div>
       )}
     </div>

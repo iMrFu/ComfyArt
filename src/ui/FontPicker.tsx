@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useValue } from 'tldraw'
 
 import { canLoadLocalFonts, COMMON_FONTS, loadLocalFonts, localFontsAtom } from '../fonts'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
 import { brandFonts } from '../library'
@@ -48,9 +49,7 @@ export function FontPicker({ value, multiple, onPick, onCancel, onError }: {
         <span className="ca-icon">{Icons.search}</span>
         <input ref={search} value={q} placeholder={t('assetPicker.search')} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e) && (custom ?? matches[0])) choose(custom ?? matches[0]) }} />
       </label>
-      <div className="ca-panel__chips">
-        {SOURCES.map(([s, label]) => <button key={s} type="button" className="ca-panel__chip" data-on={source === s || undefined} onClick={() => setSource(s)}>{label}</button>)}
-      </div>
+      <Chips value={source} options={SOURCES} onPick={setSource} />
       <div className="ca-fonts__list">
         {custom && <button type="button" className="ca-menu__item" onClick={() => choose(custom)}><span className="ca-menu__grow">{t('fontPicker.useName', custom)}</span>{picked.includes(custom) && <span className="ca-icon">{Icons.check}</span>}</button>}
         {matches.slice(0, SHOWN).map((f) => (

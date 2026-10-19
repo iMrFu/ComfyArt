@@ -1,30 +1,32 @@
 import type { TLEditorSnapshot, TLRecord } from 'tldraw'
 
-import { deleteProjectChats } from './bot'
-import { deleteUserFile, listUserFiles, readUserJson, writeUserJson } from './comfy'
+import { api } from './comfy'
 import { t } from './i18n'
 import { uuid } from './id'
 
 export const UNTITLED = t('projectHeader.untitled')
-const DIR = 'comfyart/projects'
-const HISTORY = 'comfyart/history'
 const COVERS = 2
 
-const filePath = (id: string) => `${DIR}/${id}.json`
+export interface ProjectEntry { id: string; name: string; updated: number; covers?: string[] | null; pinned?: boolean }
 
-export const loadProject = (id: string) => readUserJson<TLEditorSnapshot | null>(filePath(id), null)
+const url = (id: string, rest = '') => `/comfyart/projects/${encodeURIComponent(id)}${rest}`
+const send = (method: string, body: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export const saveProject = (id: string, snapshot: TLEditorSnapshot) => writeUserJson(filePath(id), snapshot)
+export async function call<T>(path: string, init?: RequestInit): Promise<T | null> {
+  const res = await api(path, init)
+  if (res.status === 404) return null
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error ?? `${path} failed: ${res.status}`)
+  return body as T
+}
 
-export interface ProjectEntry { id: string; name: string; updated: number; covers?: string[] }
+export const loadProject = (id: string) => call<TLEditorSnapshot>(url(id))
 
-const INDEX = 'comfyart/index.json'
-type ProjectIndex = Record<string, Omit<ProjectEntry, 'id'>>
-
-const readIndex = () => readUserJson<ProjectIndex>(INDEX, {})
+export const saveProject = (id: string, snapshot: TLEditorSnapshot, name: string, covers: string[]) =>
+  call<ProjectEntry>(url(id), send('PUT', { snapshot, name, covers }))
 
 export async function listProjects(): Promise<ProjectEntry[]> {
-  return Object.entries(await readIndex()).map(([id, e]) => ({ id, ...e })).sort((a, b) => b.updated - a.updated)
+  return (await call<{ projects: ProjectEntry[] }>('/comfyart/projects'))?.projects ?? []
 }
 
 export function coversOf(records: TLRecord[]): string[] {
@@ -34,45 +36,30 @@ export function coversOf(records: TLRecord[]): string[] {
   return [...new Set(used)].slice(-COVERS).reverse()
 }
 
-export async function touchProject(id: string, name: string, covers: string[]) {
-  const index = await readIndex()
-  index[id] = { name, updated: Date.now(), covers }
-  await writeUserJson(INDEX, index)
-}
-
 export async function fillCovers(entries: ProjectEntry[]): Promise<ProjectEntry[]> {
-  const missing = entries.filter((e) => !e.covers)
-  if (!missing.length) return entries
-  const found = await Promise.all(missing.map(async (e) => [e.id, coversOf(Object.values((await loadProject(e.id))?.document.store ?? {}))] as const))
-  const index = await readIndex()
-  for (const [id, covers] of found) if (index[id]) index[id].covers = covers
-  await writeUserJson(INDEX, index)
-  return entries.map((e) => ({ ...e, covers: index[e.id]?.covers ?? e.covers }))
+  return Promise.all(entries.map(async (e) => {
+    if (e.covers) return e
+    const covers = coversOf(Object.values((await loadProject(e.id))?.document.store ?? {}))
+    await call(url(e.id), send('PATCH', { covers }))
+    return { ...e, covers }
+  }))
 }
 
-export async function renameProject(id: string, name: string) {
-  const snapshot = await loadProject(id)
-  const doc = snapshot?.document.store['document:document' as TLRecord['id']]
-  if (snapshot && doc?.typeName === 'document') {
-    snapshot.document.store[doc.id] = { ...doc, name }
-    await saveProject(id, snapshot)
-  }
-  const index = await readIndex()
-  if (index[id]) index[id] = { ...index[id], name }
-  await writeUserJson(INDEX, index)
-}
+export const renameProject = (id: string, name: string) => call(url(id), send('PATCH', { name }))
+
+export const setPinned = (id: string, pinned: boolean) => call(url(id), send('PATCH', { pinned }))
 
 export async function deleteProjects(ids: string[]) {
-  for (const id of ids) {
-    const versions = await listUserFiles(`${HISTORY}/${id}`)
-    await Promise.all([deleteUserFile(filePath(id)), ...versions.map((f) => deleteUserFile(`${HISTORY}/${id}/${f}`)), deleteProjectChats(id)])
-  }
-  const index = await readIndex()
-  for (const id of ids) delete index[id]
-  await writeUserJson(INDEX, index)
+  await Promise.all(ids.map((id) => call(url(id), { method: 'DELETE' })))
 }
 
-export const newProjectId = () => uuid().slice(0, 8)
+export async function duplicateProject(id: string): Promise<string> {
+  const entry = (await listProjects()).find((e) => e.id === id)
+  if (!entry) throw new Error(t('home.projectNotFound'))
+  const copy = uuid().slice(0, 8)
+  await call(url(id, '/duplicate'), send('POST', { id: copy, name: t('projects.copyName', entry.name || UNTITLED) }))
+  return copy
+}
 
 export function projectUrl(id: string, params: Record<string, string | string[]> = {}) {
   const url = new URL(location.pathname, location.origin)
@@ -81,8 +68,18 @@ export function projectUrl(id: string, params: Record<string, string | string[]>
   return url.toString()
 }
 
-export function openProject(id: string, kit?: string) {
-  location.assign(projectUrl(id, kit ? { kit } : {}))
+export function openProject(id: string) {
+  location.assign(projectUrl(id))
+}
+
+export const NEW_PARAM = 'new'
+
+export function newProject(params: Record<string, string | string[]> = {}) {
+  location.assign(projectUrl(uuid().slice(0, 8), { [NEW_PARAM]: '1', ...params }))
+}
+
+export async function projectExists(id: string) {
+  return (await loadProject(id)) !== null
 }
 
 export function openView(view: 'home' | 'projects') {

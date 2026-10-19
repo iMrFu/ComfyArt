@@ -45,20 +45,24 @@ async def test_other_users_cannot_see_or_touch_a_chat(bot_client, fake_provider)
 
 
 async def test_send_streams_blocks_and_titles_the_chat(bot_client, fake_provider):
-    fake_provider.script = [BotEvent(t="delta", text="Hello "), BotEvent(t="delta", text="there"),
+    fake_provider.script = [BotEvent(t="thinking", text="Plan "), BotEvent(t="thinking", text="first"),
+                            BotEvent(t="delta", text="Hello "), BotEvent(t="delta", text="there"),
                             BotEvent(t="tool_use", name="get_canvas", input={}, id="t1"),
                             BotEvent(t="tool_result", name="get_canvas", text="{}", id="t1")]
     chat = await _chat(bot_client)
-    resp = await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "make a poster", "memory": "MEM"})
+    resp = await bot_client.post(f"/comfyart/bot/chats/{chat['id']}/send", json={"text": "make a poster", "memory": "MEM", "context": "[CTX]"})
     assert resp.status == 200
     data = await wait_bot_done(bot_client, chat["id"])
     assistant = data["messages"][-1]
-    assert [b["type"] for b in assistant["blocks"]] == ["text", "tool_use", "tool_result"]
-    assert assistant["blocks"][0]["text"] == "Hello there"
-    assert assistant["blocks"][2]["duration_ms"] >= 0
+    assert [b["type"] for b in assistant["blocks"]] == ["thinking", "text", "tool_use", "tool_result"]
+    assert assistant["blocks"][0]["text"] == "Plan first"
+    assert assistant["blocks"][1]["text"] == "Hello there"
+    assert assistant["blocks"][3]["duration_ms"] >= 0
     assert data["chat"]["title"] == "make a poster"
     assert data["chat"]["resume_token"] == "tok-1"
     assert fake_provider.last_turn.user_text.startswith("MEM\n\nmake a poster")
+    assert fake_provider.last_turn.user_text.endswith("[CTX]")
+    assert [b["text"] for b in data["messages"][0]["blocks"] if b["type"] == "text"] == ["make a poster"]
     assert fake_provider.last_turn.mcp_endpoint.endswith(f"/comfyart/mcp?bot_chat={chat['id']}")
     assert any(event == "comfyart-bot" and data["event"] == "turn_done" for event, data in SENT)
 

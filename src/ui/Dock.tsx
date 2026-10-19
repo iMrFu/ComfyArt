@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { Box, createShapeId, useEditor, useValue } from 'tldraw'
+import { useRef, useState } from 'react'
+import { atom, useEditor, useValue } from 'tldraw'
 
 import { createGenerator } from '../generate'
-import { imageUnder } from '../actions'
 import { addComposeShape, createBoard, importLayout } from '../compose'
 import { errorText } from '../jobs'
 import { GENBLOCK, QR } from '../shapes/ComposeShapes'
-import { COMMENT, COMMENT_SIZE, commentKindAtom, type CommentKind } from '../shapes/CommentShape'
+import { COMMENT, commentKindAtom, type CommentKind } from '../shapes/CommentShape'
 import { DOODLE } from '../shapes/DoodleShape'
 import { PEN } from '../shapes/PenTool'
 import { TEXT } from '../shapes/TextShape'
@@ -16,7 +15,6 @@ import { DoodleBar } from './DoodleBar'
 import { NativeStyleBar } from './NativeStyleBar'
 import { Icons } from './icons'
 import { Popover } from './Popover'
-import { shortcutsAtom } from './Shortcuts'
 import { t } from '../i18n'
 
 const INSERTS: [string, string, keyof typeof Icons, string, string?][] = [
@@ -26,6 +24,8 @@ const INSERTS: [string, string, keyof typeof Icons, string, string?][] = [
 const COMPOSE_INSERTS: [string, string, keyof typeof Icons][] = [
   ['board', t('compose.board'), 'frame'], [GENBLOCK, t('compose.aiBlock'), 'genImage'], [QR, t('compose.qrCode'), 'qr'],
 ]
+
+export const dockVideoAtom = atom('dock video', false)
 
 const KINDS: [CommentKind, string, keyof typeof Icons][] = [['point', t('dock.clickSelect'), 'comment'], ['lasso', t('dock.lassoSelect'), 'lasso'], ['box', t('dock.boxSelect'), 'box']]
 
@@ -45,48 +45,13 @@ function CommentBar() {
 export function Dock({ onError }: { onError: (msg: string) => void }) {
   const editor = useEditor()
   const tool = useValue('tool', () => editor.getCurrentToolId(), [editor])
-  const [video, setVideo] = useState(false)
+  const video = useValue(dockVideoAtom)
   const [menu, setMenu] = useState(false)
   const [insert, setInsert] = useState(false)
   const upload = useRef<HTMLInputElement>(null)
   const layout = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const keys: Record<string, () => void> = {
-      a: () => { setVideo(false); createGenerator(editor) },
-      s: () => { setVideo(true); createGenerator(editor, true) },
-      c: () => {
-        const p = editor.inputs.getCurrentPagePoint()
-        if (editor.getCurrentToolId() !== 'select' || !imageUnder(editor, new Box(p.x, p.y, 1, 1))) return editor.setCurrentTool(COMMENT)
-        const id = createShapeId()
-        editor.createShape({ id, type: COMMENT, x: p.x - COMMENT_SIZE / 2, y: p.y - COMMENT_SIZE / 2 })
-        editor.select(id)
-      },
-      d: () => editor.setCurrentTool(DOODLE),
-      p: () => editor.setCurrentTool(PEN),
-      t: () => editor.setCurrentTool(TEXT),
-      r: () => { vectorKindAtom.set('rect'); editor.setCurrentTool(VECTOR) },
-      o: () => { vectorKindAtom.set('ellipse'); editor.setCurrentTool(VECTOR) },
-      l: () => editor.setCurrentTool('line'),
-      n: () => editor.setCurrentTool('note'),
-      'shift+l': () => editor.setCurrentTool('arrow'),
-      'shift+?': () => shortcutsAtom.set(true),
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
-      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return
-      if (editor.getEditingShapeId()) return
-      const fn = keys[`${e.shiftKey ? 'shift+' : ''}${e.key.toLowerCase()}`]
-      if (!fn) return
-      e.preventDefault()
-      e.stopPropagation()
-      fn()
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [editor])
-
-  const gen = (v: boolean) => () => { setMenu(false); setVideo(v); createGenerator(editor, v) }
+  const gen = (v: boolean) => () => { setMenu(false); dockVideoAtom.set(v); createGenerator(editor, v) }
   const pickTool = (id: string) => {
     setInsert(false)
     if (id === 'text') editor.setCurrentTool(TEXT)

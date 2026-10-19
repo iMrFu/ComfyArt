@@ -1,19 +1,19 @@
 import { createShapeId, type Editor, type TLImageShape, type TLShapeId } from 'tldraw'
 
-import { loadWorkflow } from './comfy'
-import { freeSpot } from './generate'
-import { registerPlacer, selectResults, spawnHolder, startJob, type ErrorSink } from './jobs'
+import { cloudMode, loadWorkflow } from './comfy'
+import { freeSpot, GAP, registerPlacer, selectResults, spawnHolder, startJob, type ErrorSink } from './jobs'
 import { AUDIO, AUDIO_SIZE, MODEL } from './shapes/EmbedShapes'
 import { GENERATOR } from './shapes/GeneratorShape'
-import { annotated, type Built } from './workflows'
+import { annotated, randomSeed, type Built } from './workflows'
 import { t } from './i18n'
 
-export const VOICES = ['zf_xiaoxiao', 'zf_xiaoyi', 'zf_xiaobei', 'zf_xiaoni', 'zm_yunxi', 'zm_yunjian', 'zm_yunyang', 'zm_yunxia', 'af_heart', 'af_bella', 'af_nicole', 'am_adam', 'am_michael', 'bf_emma', 'bm_george', 'jf_alpha', 'jm_kumo']
+const KOKORO_VOICES = ['zf_xiaoxiao', 'zf_xiaoyi', 'zf_xiaobei', 'zf_xiaoni', 'zm_yunxi', 'zm_yunjian', 'zm_yunyang', 'zm_yunxia', 'af_heart', 'af_bella', 'af_nicole', 'am_adam', 'am_michael', 'bf_emma', 'bm_george', 'jf_alpha', 'jm_kumo']
+const QWEN_VOICES = ['Serena', 'Vivian', 'Uncle_fu', 'Dylan', 'Eric', 'Ryan', 'Aiden', 'Ono_anna', 'Sohee']
+export const voices = () => (cloudMode() ? QWEN_VOICES : KOKORO_VOICES)
 const LANGS: Record<string, string> = { a: 'English', b: 'English (British)', j: 'Japanese', z: 'Mandarin Chinese', e: 'Spanish', f: 'French', h: 'Hindi', i: 'Italian', p: 'Brazilian Portuguese' }
 export const MUSIC_SECONDS = [15, 30, 60, 120]
 export const SFX_SECONDS = [3, 5, 8, 15]
 const MODEL_SIZE = 480
-const GAP = 40
 
 export type AudioSpec =
   | { kind: 'music'; prompt: string; lyrics: string; seconds: number }
@@ -23,22 +23,25 @@ export type AudioSpec =
   | { kind: 'voxcpm2_clone'; text: string; reference: string }
   | { kind: 'sfx'; prompt: string; seconds: number }
 
-const seed = () => Math.floor(Math.random() * 2 ** 31)
-
 async function audioGraph(spec: AudioSpec): Promise<Built> {
   if (spec.kind === 'music') {
     const g = await loadWorkflow('music-ace-step.api.json')
     Object.assign(g['3'].inputs, { tags: spec.prompt, lyrics: spec.lyrics || '[instrumental]' })
     g['5'].inputs.seconds = spec.seconds
-    g['6'].inputs.seed = seed()
+    g['6'].inputs.seed = randomSeed()
     return { graph: g, result: '8' }
   }
   if (spec.kind === 'sfx') {
     const g = await loadWorkflow('sfx-stable-audio.api.json')
     g['3'].inputs.text = spec.prompt
     g['5'].inputs.seconds = spec.seconds
-    g['6'].inputs.seed = seed()
+    g['6'].inputs.seed = randomSeed()
     return { graph: g, result: '8' }
+  }
+  if (spec.kind === 'speech' && cloudMode()) {
+    const g = await loadWorkflow('speech-qwen3tts.api.json')
+    Object.assign(g['1'].inputs, { text: spec.text, speaker: spec.voice, seed: randomSeed() })
+    return { graph: g, result: '2' }
   }
   if (spec.kind === 'speech') {
     const g = await loadWorkflow('speech-kokoro.api.json')
@@ -48,8 +51,7 @@ async function audioGraph(spec: AudioSpec): Promise<Built> {
   }
   if (spec.kind === 'voxcpm2') {
     const g = await loadWorkflow('speech-voxcpm2.api.json')
-    g['1'].inputs.text = spec.text
-    g['1'].inputs.voice_design = spec.voiceDesign || ''
+    Object.assign(g['1'].inputs, { text: spec.text, voice_design: spec.voiceDesign || '' })
     return { graph: g, result: '2' }
   }
   if (spec.kind === 'voxcpm2_clone') {
@@ -58,9 +60,15 @@ async function audioGraph(spec: AudioSpec): Promise<Built> {
     g['2'].inputs.audio = annotated(spec.reference)
     return { graph: g, result: '4' }
   }
+  if (cloudMode()) {
+    const g = await loadWorkflow('voice-clone-qwen3tts.api.json')
+    g['1'].inputs.audio = annotated(spec.reference)
+    Object.assign(g['2'].inputs, { target_text: spec.text, seed: randomSeed() })
+    return { graph: g, result: '3' }
+  }
   const g = await loadWorkflow('voice-clone-indextts.api.json')
   g['1'].inputs.audio = annotated(spec.reference)
-  Object.assign(g['3'].inputs, { text: spec.text, seed: seed() })
+  Object.assign(g['3'].inputs, { text: spec.text, seed: randomSeed() })
   return { graph: g, result: '4' }
 }
 

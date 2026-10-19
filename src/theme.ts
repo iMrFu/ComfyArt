@@ -1,5 +1,6 @@
 import { atom, type Editor } from 'tldraw'
 
+import { readLocal, writeLocal } from './localPrefs'
 import { t } from './i18n'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -7,18 +8,26 @@ export const THEMES: [Theme, string][] = [['light', t('projectHeader.themeLight'
 
 const KEY = 'comfyart.theme'
 
-export const themeAtom = atom<Theme>('theme', (() => {
-  try {
-    const stored = localStorage.getItem(KEY)
-    return stored === 'dark' || stored === 'system' ? stored : 'light'
-  } catch { return 'light' }
-})())
+export const themeAtom = atom<Theme>('theme', 'dark')
 
-const isDark = (theme: Theme) => theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+const systemDark = matchMedia('(prefers-color-scheme: dark)')
+const isDark = (theme: Theme) => theme === 'dark' || (theme === 'system' && systemDark.matches)
+
+export async function initTheme() {
+  const stored = readLocal(KEY)
+  if (stored === 'light' || stored === 'dark' || stored === 'system') themeAtom.set(stored)
+  else {
+    const res = await fetch('/api/settings/Comfy.ColorPalette').catch(() => null)
+    const palette = res?.ok ? await res.json().catch(() => null) : null
+    themeAtom.set(palette === 'light' ? 'light' : 'dark')
+  }
+  markDark(isDark(themeAtom.get()))
+  systemDark.addEventListener('change', () => { if (themeAtom.get() === 'system') markDark(systemDark.matches) })
+}
 
 export function saveTheme(theme: Theme) {
   themeAtom.set(theme)
-  try { localStorage.setItem(KEY, theme) } catch { }
+  writeLocal(KEY, theme)
   markDark(isDark(theme))
 }
 
@@ -30,5 +39,3 @@ export function setTheme(editor: Editor, theme: Theme) {
 export function markDark(dark: boolean) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
 }
-
-markDark(isDark(themeAtom.get()))

@@ -11,6 +11,7 @@ import { FontPicker } from './FontPicker'
 import { Icons } from './icons'
 import { Popover } from './Popover'
 import { useOnlySelected, useSelectionRect } from './selection'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 
 const GAP = 22
@@ -24,14 +25,6 @@ const CASES: [string, string][] = [['none', t('styleToolbars.asTyped')], ['upper
 const FILLS: [string, string][] = [['solid', t('styleToolbars.solid')], ['linear', t('styleToolbars.linear')], ['radial', t('styleToolbars.radial')], ['image', t('common.image')]]
 const STROKE_ALIGNS: [string, string][] = [['inside', t('styleToolbars.inside')], ['center', t('styleToolbars.center')], ['outside', t('styleToolbars.outside')]]
 const DASHES: [string, string][] = [['solid', t('nativeStyleBar.solid')], ['dashed', t('nativeStyleBar.dashed')], ['dotted', t('nativeStyleBar.dotted')]]
-
-function Chips({ value, options, onPick }: { value: string; options: [string, string][]; onPick: (v: string) => void }) {
-  return (
-    <div className="ca-panel__chips">
-      {options.map(([v, label]) => <button key={v} type="button" className="ca-panel__chip" data-on={value === v || undefined} onClick={() => onPick(v)}>{label}</button>)}
-    </div>
-  )
-}
 
 export function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -194,7 +187,6 @@ export function TextToolbar({ onError }: { onError: (msg: string) => void }) {
   )
 }
 
-const MAX_STOPS = 6
 
 function fillPreview(p: VectorShape['props']) {
   const stops = [...p.stops].sort((a, b) => a.offset - b.offset).map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(', ')
@@ -224,7 +216,7 @@ function FillEditor({ editor, p, set }: { editor: ReturnType<typeof useEditor>; 
             </div>
           ))}
           <div className="ca-style__row">
-            {p.stops.length < MAX_STOPS && <button type="button" className="ca-panel__chip" onClick={() => set({ stops: [...p.stops, { offset: 0.5, color: p.stops.at(-1)?.color ?? p.fill }] })}>{t('styleToolbars.addStop')}</button>}
+            <button type="button" className="ca-panel__chip" onClick={() => set({ stops: [...p.stops, { offset: 0.5, color: p.stops.at(-1)?.color ?? p.fill }] })}>{t('styleToolbars.addStop')}</button>
             {p.fillType === 'linear' && <Num label={t('styleToolbars.angle')} value={p.angle} min={-360} onChange={(v) => set({ angle: v })} />}
           </div>
         </>

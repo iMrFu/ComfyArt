@@ -1,3 +1,3 @@
-from . import bot, bot_complete, concat, mix_audio, mcp, mcp_commands, models, ocr, pdf, providers, settings, thumbs
+from . import bot, bot_complete, cloud, concat, mcp, mcp_commands, mix_audio, models, ocr, pdf, projects, providers, settings, thumbs
 
 bot.reap_stale_messages()

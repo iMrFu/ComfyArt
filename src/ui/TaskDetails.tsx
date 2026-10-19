@@ -3,6 +3,7 @@ import { atom, useValue, type Editor } from 'tldraw'
 import { chatIdAtom, chatsAtom, messagesAtom, outputsOf, providersAtom, toolLabel, type BotBlock } from '../bot'
 import { fileSrc } from '../jobs'
 import { Icons } from './icons'
+import { Modal } from './Modal'
 import { t } from '../i18n'
 
 const AUDIO_FILES = ['flac', 'mp3', 'wav', 'ogg', 'opus', 'm4a']
@@ -64,53 +65,47 @@ export function TaskDetails({ editor }: { editor: Editor }) {
   const requestText = request?.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-details">
-        <div className="ca-side__head">
-          <span>{t('agentPanel.taskDetails')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
-        </div>
-        <div className="ca-details__body">
-          {request && (
-            <section>
-              <div className="ca-gen__label">{t('taskDetails.originalRequest')}</div>
-              {requestText && <div className="ca-info__prompt">{requestText}</div>}
-              <div className="ca-chat__thumbs">
-                {request.blocks.filter((b) => b.type === 'image' || b.type === 'video').map((b) => <Thumb key={b.url} editor={editor} src={b.url!} onOpen={close} />)}
-              </div>
-              {request.blocks.filter((b) => b.type === 'skill' || b.type === 'kit').map((b) => (
-                <span key={b.name} className="ca-chip"><span className="ca-icon">{b.type === 'skill' ? Icons.skill : Icons.assets}</span>{b.name}</span>
-              ))}
-            </section>
-          )}
+    <Modal title={t('agentPanel.taskDetails')} className="ca-details" onClose={close}>
+      <div className="ca-details__body">
+        {request && (
           <section>
-            <div className="ca-gen__label">{t('taskDetails.process', chat ? ` · ${providers.find((p) => p.id === chat.provider)?.label ?? chat.provider}` : '')}</div>
-            <ol className="ca-details__steps">
-              {steps(m.blocks).map((s, i) => (
-                <li key={i}>
-                  <span className="ca-details__step"><b>{s.label}</b><span className="ca-menu__grow" /><span>{s.state}</span></span>
-                  {s.detail && <div className="ca-details__detail">{s.detail}</div>}
-                  {s.result && <div className="ca-details__detail" data-error>{s.result}</div>}
-                </li>
-              ))}
-            </ol>
+            <div className="ca-gen__label">{t('taskDetails.originalRequest')}</div>
+            {requestText && <div className="ca-info__prompt">{requestText}</div>}
+            <div className="ca-chat__thumbs">
+              {request.blocks.filter((b) => b.type === 'image' || b.type === 'video').map((b) => <Thumb key={b.url} editor={editor} src={b.url!} onOpen={close} />)}
+            </div>
+            {request.blocks.filter((b) => b.type === 'skill' || b.type === 'kit').map((b) => (
+              <span key={b.name} className="ca-chip"><span className="ca-icon">{b.type === 'skill' ? Icons.skill : Icons.assets}</span>{b.name}</span>
+            ))}
           </section>
-          {outputs.length > 0 && (
-            <section>
-              <div className="ca-gen__label">{t('taskDetails.output')}</div>
-              <div className="ca-chat__thumbs">{outputs.map((s) => <Thumb key={s} editor={editor} src={s} onOpen={close} />)}</div>
-            </section>
-          )}
-          {m.usage && (
-            <section>
-              <div className="ca-gen__label">{t('taskDetails.usageThisTurn')}</div>
-              <div className="ca-keys__row"><span>{t('taskDetails.input')}</span><span className="ca-menu__key">{(m.usage.input_tokens ?? 0) + (m.usage.cache_read_input_tokens ?? 0)} tokens</span></div>
-              <div className="ca-keys__row"><span>{t('taskDetails.outputs')}</span><span className="ca-menu__key">{m.usage.output_tokens ?? 0} tokens</span></div>
-              {m.usage.cost_usd != null && <div className="ca-keys__row"><span>{t('taskDetails.cost')}</span><span className="ca-menu__key">${m.usage.cost_usd}</span></div>}
-            </section>
-          )}
-        </div>
+        )}
+        <section>
+          <div className="ca-gen__label">{t('taskDetails.process', chat ? ` · ${providers.find((p) => p.id === chat.provider)?.label ?? chat.provider}` : '')}</div>
+          <ol className="ca-details__steps">
+            {steps(m.blocks).map((s, i) => (
+              <li key={i}>
+                <span className="ca-details__step"><b>{s.label}</b><span className="ca-menu__grow" /><span>{s.state}</span></span>
+                {s.detail && <div className="ca-details__detail">{s.detail}</div>}
+                {s.result && <div className="ca-details__detail" data-error>{s.result}</div>}
+              </li>
+            ))}
+          </ol>
+        </section>
+        {outputs.length > 0 && (
+          <section>
+            <div className="ca-gen__label">{t('taskDetails.output')}</div>
+            <div className="ca-chat__thumbs">{outputs.map((s) => <Thumb key={s} editor={editor} src={s} onOpen={close} />)}</div>
+          </section>
+        )}
+        {m.usage && (
+          <section>
+            <div className="ca-gen__label">{t('taskDetails.usageThisTurn')}</div>
+            <div className="ca-keys__row"><span>{t('taskDetails.input')}</span><span className="ca-menu__key">{(m.usage.input_tokens ?? 0) + (m.usage.cache_read_input_tokens ?? 0)} tokens</span></div>
+            <div className="ca-keys__row"><span>{t('taskDetails.outputs')}</span><span className="ca-menu__key">{m.usage.output_tokens ?? 0} tokens</span></div>
+            {m.usage.cost_usd != null && <div className="ca-keys__row"><span>{t('taskDetails.cost')}</span><span className="ca-menu__key">${m.usage.cost_usd}</span></div>}
+          </section>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }

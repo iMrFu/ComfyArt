@@ -66,7 +66,7 @@ Upscale 2× or 4×. **Faithful to original** uses 4x-UltraSharp; **Enhance detai
 **Split Layers** separates an image into editable layers inside a frame, with a background layer underneath:
 
 - **Auto Split** runs Qwen Image Layered and keeps the useful layers.
-- **Custom Split** lets you draw up to six boxes; SAM3 cuts out the object in each box.
+- **Custom Split** lets you draw boxes; SAM3 cuts out the object in each box.
 - **Separate Regions** works on any layer, including one that a split left with two things mixed together: draw one box around the part to pull out, adjust its edges, and that part becomes its own layer, cropped to its visible pixels. It is instant and runs no model.
 
 After a split, the background is the original image with every split layer erased and filled in, so moving or hiding a layer reveals clean background instead of a duplicate.

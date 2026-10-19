@@ -4,7 +4,7 @@ import { useValue } from 'tldraw'
 import { botEnabledAtom, providersAtom, refreshBot, saveSettings, settingsAtom, type BotSettings as Settings } from '../bot'
 import { errorText } from '../jobs'
 import { botSettingsOpenAtom } from './AgentPicker'
-import { Icons } from './icons'
+import { Modal } from './Modal'
 import { t } from '../i18n'
 
 const TEXT_FIELDS: [string, string, string][] = [
@@ -37,53 +37,47 @@ export function BotSettings({ onError }: { onError: (msg: string) => void }) {
   const save = () => void saveSettings(draft).then(refreshBot).then(close).catch((e) => onError(errorText(e)))
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename">
-        <div className="ca-side__head">
-          <span>{t('botSettings.agentSettings')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
-        </div>
-        <div className="ca-rename__body">
-          {SWITCHES.map(([key, label]) => (
-            <label key={key} className="ca-notice__push">
-              <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })} />
-              <span>{label}</span>
-            </label>
-          ))}
-          <div className="ca-gen__label">{t('botSettings.availableAgents')}</div>
-          {!enabled && <div className="ca-chat__hint">{t('botSettings.availableAgentsOnThisMachine')}</div>}
-          {providers.map((p) => (
-            <div key={p.id} className="ca-keys__row">
-              <span>{p.label}</span>
-              <span className="ca-menu__key" title={p.detail}>{p.available ? p.version || t('botSettings.available') : p.detail || t('botSettings.unavailable')}</span>
-            </div>
-          ))}
-          <div className="ca-chat__hint">{t('botSettings.claudeCodeCodexQwenCode')}</div>
-          {TEXT_FIELDS.map(([key, label, hint]) => (
-            <label key={key} className="ca-rename__field">
-              <span>{label}</span>
-              <input className="ca-panel__input" value={String(draft[key] ?? '')} placeholder={hint} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
-            </label>
-          ))}
-          {FLAGS.map(([key, label]) => (
-            <label key={key} className="ca-notice__push">
-              <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })} />
-              <span>{label}</span>
-            </label>
-          ))}
-          <label className="ca-rename__field">
-            <span>{t('botSettings.ocrEngine')}</span>
-            <select className="ca-panel__input" value={String(draft['ocr-engine'] ?? 'local')} onChange={(e) => setDraft({ ...draft, 'ocr-engine': e.target.value })}>
-              <option value="local">{t('botSettings.ocrLocal')}</option>
-              <option value="agent">{t('botSettings.ocrAgent')}</option>
-            </select>
+    <Modal title={t('botSettings.agentSettings')} onClose={close}>
+      <div className="ca-rename__body">
+        {SWITCHES.map(([key, label]) => (
+          <label key={key} className="ca-notice__push">
+            <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })} />
+            <span>{label}</span>
           </label>
-          <div className="ca-panel__foot">
-            <button type="button" className="ca-panel__secondary" onClick={close}>{t('common.cancel')}</button>
-            <button type="button" className="ca-panel__primary" onClick={save}>{t('common.save')}</button>
+        ))}
+        <div className="ca-gen__label">{t('botSettings.availableAgents')}</div>
+        {!enabled && <div className="ca-chat__hint">{t('botSettings.availableAgentsOnThisMachine')}</div>}
+        {providers.map((p) => (
+          <div key={p.id} className="ca-keys__row">
+            <span>{p.label}</span>
+            <span className="ca-menu__key" title={p.detail}>{p.available ? p.version || t('botSettings.available') : p.detail || t('botSettings.unavailable')}</span>
           </div>
+        ))}
+        <div className="ca-chat__hint">{t('botSettings.claudeCodeCodexQwenCode')}</div>
+        {TEXT_FIELDS.map(([key, label, hint]) => (
+          <label key={key} className="ca-rename__field">
+            <span>{label}</span>
+            <input className="ca-panel__input" value={String(draft[key] ?? '')} placeholder={hint} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
+          </label>
+        ))}
+        {FLAGS.map(([key, label]) => (
+          <label key={key} className="ca-notice__push">
+            <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })} />
+            <span>{label}</span>
+          </label>
+        ))}
+        <label className="ca-rename__field">
+          <span>{t('botSettings.ocrEngine')}</span>
+          <select className="ca-panel__input" value={String(draft['ocr-engine'] ?? 'local')} onChange={(e) => setDraft({ ...draft, 'ocr-engine': e.target.value })}>
+            <option value="local">{t('botSettings.ocrLocal')}</option>
+            <option value="agent">{t('botSettings.ocrAgent')}</option>
+          </select>
+        </label>
+        <div className="ca-panel__foot">
+          <button type="button" className="ca-panel__secondary" onClick={close}>{t('common.cancel')}</button>
+          <button type="button" className="ca-panel__primary" onClick={save}>{t('common.save')}</button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

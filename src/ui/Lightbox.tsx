@@ -3,6 +3,7 @@ import { atom, useValue, type Editor, type TLShapeId } from 'tldraw'
 
 import { mediaAsset } from '../jobs'
 import { Icons } from './icons'
+import { useEscape } from './escape'
 import { t } from '../i18n'
 
 export const lightboxAtom = atom<TLShapeId | null>('lightbox', null)
@@ -24,6 +25,7 @@ export function Lightbox({ editor }: { editor: Editor }) {
   const [muted, setMuted] = useState(false)
   const [turn, setTurn] = useState(0)
   const index = items.findIndex((i) => i.id === id)
+  useEscape(!!id, () => lightboxAtom.set(null))
   const item = items[index]
 
   useEffect(() => { setZoom(1); setTurn(0) }, [id])
@@ -32,8 +34,7 @@ export function Lightbox({ editor }: { editor: Editor }) {
     if (!id) return
     const go = (d: number) => items.length && lightboxAtom.set(items[(index + d + items.length) % items.length].id)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') lightboxAtom.set(null)
-      else if (e.key === 'ArrowLeft') go(-1)
+      if (e.key === 'ArrowLeft') go(-1)
       else if (e.key === 'ArrowRight') go(1)
       else return
       e.stopPropagation()

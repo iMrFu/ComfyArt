@@ -12,6 +12,7 @@ from ._cli_common import (
     TURN_MAX_S,
     base_spawn_env,
     kill_process_tree,
+    run_command,
 )
 from .deepseek_harness_runtime import (
     BOT_PROFILE,
@@ -143,18 +144,15 @@ class DeepSeekHarnessProvider(AgentProvider):
         status = ProviderStatus(available=False, detail=reason)
         if argv is not None:
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    *argv, "--version", stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE, env=base_spawn_env())
-                out, err = await asyncio.wait_for(proc.communicate(), timeout=VERSION_TIMEOUT_S)
+                code, out, err = await run_command([*argv, "--version"], timeout=VERSION_TIMEOUT_S, env=base_spawn_env())
             except (OSError, asyncio.TimeoutError) as e:
                 status = ProviderStatus(available=False, detail=f"dsh --version failed: {e}")
             else:
-                if proc.returncode == 0:
+                if code == 0:
                     status = ProviderStatus(available=True, version=out.decode("utf-8", "replace").strip())
                 else:
                     detail = err.decode("utf-8", "replace").strip()[-200:]
-                    status = ProviderStatus(available=False, detail=f"dsh --version exited with {proc.returncode}: {detail}")
+                    status = ProviderStatus(available=False, detail=f"dsh --version exited with {code}: {detail}")
         self._probe_cache = (now, argv, status)
         return status
 
@@ -173,10 +171,10 @@ class DeepSeekHarnessProvider(AgentProvider):
     async def _on_update(self, update: dict, emit: EmitFn, names: dict[str, str]) -> None:
         kind = update.get("sessionUpdate")
         call_id = str(update.get("toolCallId") or "")
-        if kind == "agent_message_chunk":
+        if kind in ("agent_message_chunk", "agent_thought_chunk"):
             content = update.get("content") or {}
             if content.get("type") == "text" and content.get("text"):
-                await emit(BotEvent(t="delta", text=content["text"]))
+                await emit(BotEvent(t="delta" if kind == "agent_message_chunk" else "thinking", text=content["text"]))
         elif kind == "config_option_update":
             self._catalog = model_options_from(update.get("configOptions")) or self._catalog
         elif kind == "tool_call":

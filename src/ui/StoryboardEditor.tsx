@@ -1,6 +1,7 @@
-import { DURATIONS, MAX_SCENES, MAX_STORY_SECONDS } from '../generate'
-import type { Scene } from '../workflows'
+import { DURATIONS } from '../genOptions'
+import type { Scene } from '../videoGraphs'
 import { Icons } from './icons'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 
 export function StoryboardEditor({ scenes, onChange, onSmart, smartBusy }: { scenes: Scene[]; onChange: (scenes: Scene[]) => void; onSmart: () => void; smartBusy: boolean }) {
@@ -12,9 +13,7 @@ export function StoryboardEditor({ scenes, onChange, onSmart, smartBusy }: { sce
         <div key={i} className="ca-story__scene">
           <div className="ca-story__head">
             <span>{t('storyboardEditor.scene', i + 1)}</span>
-            <div className="ca-panel__chips">
-              {DURATIONS.map((d) => <button key={d} type="button" className="ca-panel__chip" data-on={s.duration === d || undefined} onClick={() => set(i, { duration: d })}>{d}s</button>)}
-            </div>
+            <Chips value={s.duration} options={DURATIONS.map((d) => [d, `${d}s`] as const)} onPick={(d) => set(i, { duration: d })} />
             {scenes.length > 1 && <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => onChange(scenes.filter((_, j) => j !== i))}>{Icons.trash}</button>}
           </div>
           <textarea
@@ -27,11 +26,9 @@ export function StoryboardEditor({ scenes, onChange, onSmart, smartBusy }: { sce
         </div>
       ))}
       <div className="ca-story__foot">
-        {scenes.length < MAX_SCENES && (
-          <button type="button" className="ca-panel__chip" onClick={() => onChange([...scenes, { prompt: '', duration: DURATIONS[0] }])}>{t('storyboardEditor.addScene', scenes.length + 1)}</button>
-        )}
+        <button type="button" className="ca-panel__chip" onClick={() => onChange([...scenes, { prompt: '', duration: DURATIONS[0] }])}>{t('storyboardEditor.addScene', scenes.length + 1)}</button>
         <button type="button" className="ca-panel__chip" disabled={smartBusy || !scenes.some((s) => s.prompt.trim())} title={t('storyboardEditor.automaticallySplitTheFirstScene')} onClick={onSmart}>{smartBusy ? t('storyboardEditor.splitting') : t('storyboardEditor.smartStoryboard')}</button>
-        <span className="ca-story__total" data-over={total > MAX_STORY_SECONDS || undefined}>{t('storyboardEditor.total', total, total > MAX_STORY_SECONDS ? t('storyboardEditor.exceedsTheLimit', MAX_STORY_SECONDS) : '')}</span>
+        <span className="ca-story__total">{t('storyboardEditor.total', total)}</span>
       </div>
     </div>
   )

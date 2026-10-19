@@ -1,6 +1,6 @@
 import { atom } from 'tldraw'
 
-import { api, loadWorkflow, queuePrompt, uploadImage, waitForText } from './comfy'
+import { api, loadWorkflow, queuePrompt, uploadImage, viewUrl, waitForText } from './comfy'
 import { t } from './i18n'
 import { botEnabledAtom, settingsAtom } from './bot'
 import { annotated } from './workflows'
@@ -44,8 +44,12 @@ export async function ask(prompt: string, system: string, images: string[]): Pro
 
 export async function transcribe(audio: Blob): Promise<string> {
   const ref = await uploadImage(audio, `voice-${Date.now()}.webm`)
+  return transcribeFile(viewUrl(ref))
+}
+
+export async function transcribeFile(src: string): Promise<string> {
   const g = await loadWorkflow('transcribe-gemma4.api.json')
-  g.a = { class_type: 'LoadAudio', inputs: { audio: `${ref.subfolder}/${ref.filename} [${ref.type}]` } }
+  g.a = { class_type: 'LoadAudio', inputs: { audio: annotated(src) } }
   Object.assign(g['2'].inputs, {
     audio: ['a', 0],
     prompt: 'Transcribe the speech exactly. Output only the transcript. Write Chinese in simplified characters.',

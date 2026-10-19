@@ -3,11 +3,10 @@ import type { Editor, TLImageShape } from 'tldraw'
 
 import { loadImage } from './adjust'
 import { uploadImage, viewUrl } from './comfy'
-import { placeMedia } from './jobs'
+import { GAP, placeMedia } from './jobs'
 import { t } from './i18n'
 
 const MAX_SIDE = 1024
-const GAP = 40
 const RASTER_STEP = 512
 const RASTER_MAX = 4096
 const rasters = new Map<string, Promise<string>>()

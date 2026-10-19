@@ -52,9 +52,8 @@ export async function logMemory(entries: Omit<MemoryLog, 'time'>[]) {
 
 const same = (a: string, b: string) => a === b || a.includes(b) || b.includes(a)
 
-
 export async function forget(texts: string[], source: string): Promise<string[]> {
-  const list = memoryAtom.get()
+  const list = await loadMemory()
   const gone = list.filter((m) => texts.some((t) => t.trim() && same(m.text, t.trim())))
   if (!gone.length) return []
   await saveMemory(list.filter((m) => !gone.includes(m)))
@@ -63,7 +62,7 @@ export async function forget(texts: string[], source: string): Promise<string[]>
 }
 
 export async function correct(items: Correction[], source: string): Promise<string[]> {
-  const list = memoryAtom.get()
+  const list = await loadMemory()
   const done: string[] = []
   const next = list.map((m) => {
     const c = items.find((x) => same(m.text, x.old))
@@ -83,7 +82,7 @@ export async function saveMemory(list: Memory[]) {
 }
 
 export async function remember(items: MemoryInput[], source = t('botCommands.chat')) {
-  const known = new Set(memoryAtom.get().map((m) => m.text))
+  const known = new Set((await loadMemory()).map((m) => m.text))
   const fresh = items.filter((m) => !known.has(m.text))
   if (!fresh.length) return
   await saveMemory([...memoryAtom.get(), ...fresh.map((m) => ({ id: uuid().slice(0, 8), text: m.text, time: Date.now(), ...(m.category ? { category: m.category } : {}) }))])

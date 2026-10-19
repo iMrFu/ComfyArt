@@ -1,4 +1,5 @@
 import { loadImage } from './adjust'
+import { canvasBlob } from './canvasBlob'
 
 export interface Placement { x: number; y: number; scale: number; rotation: number; warp: number }
 export interface MockupSources { photo: string; depth: string; mask: string; design: string }
@@ -133,7 +134,5 @@ export async function bakeMockup(sources: MockupSources, placement: Placement): 
   await r.load(sources)
   ;[canvas.width, canvas.height] = r.size
   r.draw(placement)
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'))
-  if (!blob) throw new Error('bake failed')
-  return blob
+  return canvasBlob(canvas)
 }

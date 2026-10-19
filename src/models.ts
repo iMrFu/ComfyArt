@@ -1,6 +1,6 @@
 import { atom } from 'tldraw'
 
-import { api, loadModelPaths, readUserJson, writeUserJson } from './comfy'
+import { api, cloudMode, loadModelPaths, readUserJson, writeUserJson } from './comfy'
 import { t } from './i18n'
 
 export interface ModelDef {
@@ -11,35 +11,36 @@ export interface ModelDef {
   video?: boolean
   refs?: 'qwen' | 'latent'
   prompt?: string
-  seed?: [string, string]
   steps?: [string, Record<string, number>]
   sizes?: string[]
   vae?: string
   caption?: string
   control?: string
+  negative?: [string, string]
+  lora?: string
 }
 
 export const IMAGE_MODELS: ModelDef[] = [
   {
     id: 'qwen-image-2.1-t2i.api.json', label: 'Qwen Image 2.1', desc: t('models.highOverallQualityAccurateChinese'), files: ['qwen_image_2.1_int8_convrot.safetensors'],
-    refs: 'qwen', prompt: 'prompt', seed: ['7', 'seed'], steps: ['7', { fast: 12, standard: 25, high: 40 }], sizes: ['5'], vae: '4',
+    refs: 'qwen', prompt: 'prompt', steps: ['7', { fast: 12, standard: 25, high: 40 }], sizes: ['5'], vae: '4', lora: 'qwen-image-2.1',
   },
   {
     id: 'z-image-turbo-t2i.api.json', label: 'Z-Image Turbo', desc: t('models.fast8StepGenerationGreat'), files: ['z_image_turbo_bf16.safetensors'],
-    prompt: 'text', seed: ['7', 'seed'], sizes: ['5'], vae: '3',
+    prompt: 'text', sizes: ['5'], vae: '3', lora: 'z-image',
   },
   {
     id: 'flux2-klein-9b-t2i.api.json', label: 'Flux.2 Klein 9B', desc: t('models.fast4StepGenerationSupports'), files: ['flux-2-klein-9b-nvfp4.safetensors'],
-    refs: 'latent', prompt: 'text', seed: ['14', 'noise_seed'], sizes: ['5', '13'], vae: '3',
+    refs: 'latent', prompt: 'text', sizes: ['5', '13'], vae: '3', lora: 'flux2-klein',
   },
   {
     id: 'qwen-image-2512-t2i.api.json', label: 'Qwen Image 2512', desc: t('models.solidDetailAndCompositionSupports'), files: ['qwen_image_2512_fp8_e4m3fn.safetensors'],
-    prompt: 'text', seed: ['7', 'seed'], steps: ['7', { fast: 20, standard: 30, high: 50 }], sizes: ['5'], vae: '3', control: 'Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors',
+    prompt: 'text', steps: ['7', { fast: 20, standard: 30, high: 50 }], sizes: ['5'], vae: '3', control: 'Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors', negative: ['10', 'text'], lora: 'qwen-image',
   },
   {
     id: 'ideogram4-t2i.api.json', label: 'Ideogram 4', desc: t('models.greatAtLayoutLogosAnd'), files: ['ideogram4_fp8_scaled.safetensors', 'ideogram4_unconditional_fp8_scaled.safetensors'],
     prompt: 'text', caption: 'ideogram4-caption.json',
-    seed: ['14', 'noise_seed'], steps: ['13', { fast: 12, standard: 20, high: 48 }], sizes: ['5', '13'], vae: '3',
+    steps: ['13', { fast: 12, standard: 20, high: 48 }], sizes: ['5', '13'], vae: '3',
   },
 ]
 
@@ -83,5 +84,5 @@ export function agentModels(video: boolean): ModelDef[] {
 
 export function isInstalled(id: string): boolean {
   const installed = installedAtom.get()
-  return !installed || installed.includes(id)
+  return cloudMode() || !installed || installed.includes(id)
 }

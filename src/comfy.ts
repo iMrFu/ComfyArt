@@ -1,4 +1,6 @@
-import { CLIENT_ID } from './ws'
+import { readLocal } from './localPrefs'
+import { t } from './i18n'
+import { CLIENT_ID, onComfyEvent } from './ws'
 
 const POLL_MS = 1500
 
@@ -7,8 +9,13 @@ export type PromptGraph = Record<string, { class_type: string; inputs: Record<st
 export interface ImageRef { filename: string; subfolder: string; type: string; metadata?: { width?: number; height?: number } }
 
 function comfyUser(): string | null {
-  try { return localStorage.getItem('Comfy.userId') } catch { return null }
+  return readLocal('Comfy.userId')
 }
+
+let cloud = false
+export const setCloud = (on: boolean) => { cloud = on }
+export const cloudMode = () => cloud
+const CLOUD_ID = 'cloud:'
 
 export function api(path: string, init?: RequestInit) {
   const user = comfyUser()
@@ -70,11 +77,18 @@ export function refKind(src: string): RefKind {
   return VIDEO_EXTS.includes(ext) ? 'video' : AUDIO_EXTS.includes(ext) ? 'audio' : 'image'
 }
 
-export function mediaMeta(src: string, kind: 'video' | 'audio'): Promise<{ seconds: number; aspect: number }> {
+export function mediaMeta(src: string, kind: RefKind): Promise<{ seconds: number; w: number; h: number }> {
   return new Promise((resolve, reject) => {
+    if (kind === 'image') {
+      const img = new Image()
+      img.onload = () => resolve({ seconds: 0, w: img.naturalWidth, h: img.naturalHeight })
+      img.onerror = () => reject(new Error(`cannot read ${src}`))
+      img.src = src
+      return
+    }
     const el = document.createElement(kind)
     el.preload = 'metadata'
-    el.onloadedmetadata = () => resolve({ seconds: el.duration, aspect: el instanceof HTMLVideoElement ? el.videoWidth / el.videoHeight : 1 })
+    el.onloadedmetadata = () => resolve({ seconds: el.duration, w: el instanceof HTMLVideoElement ? el.videoWidth : 0, h: el instanceof HTMLVideoElement ? el.videoHeight : 0 })
     el.onerror = () => reject(new Error(`cannot read ${src}`))
     el.src = src
   })
@@ -112,30 +126,88 @@ function withModelPaths(prompt: PromptGraph): PromptGraph {
   }]))
 }
 
+function promptError(body: any, status: number): string {
+  const lines = Object.entries<any>(body?.node_errors ?? {}).flatMap(([id, ne]) =>
+    (ne?.errors ?? []).map((er: any) => `${ne.class_type ?? ''} #${id}: ${er.message}${er.details ? ` — ${er.details}` : ''}`))
+  if (lines.length) return lines.join('\n')
+  const top = body?.error
+  if (!top?.message) return `queue failed: ${status}`
+  return top.details ? `${top.message}: ${top.details}` : top.message
+}
+
 export async function queuePrompt(prompt: PromptGraph): Promise<string> {
-  const res = await api('/prompt', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: withModelPaths(prompt), client_id: CLIENT_ID }),
-  })
-  const body = await res.json()
-  if (!res.ok) throw new Error(body?.error?.message ?? `queue failed: ${res.status}`)
+  const init = { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+  const res = cloud
+    ? await api('/comfyart/cloud/prompt', { ...init, body: JSON.stringify({ prompt }) })
+    : await api('/prompt', { ...init, body: JSON.stringify({ prompt: withModelPaths(prompt), client_id: CLIENT_ID }) })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(promptError(body, res.status))
   return String(body.prompt_id)
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const queued = (list: unknown[] | undefined, promptId: string) => (list ?? []).some((e) => Array.isArray(e) && String(e[1]) === promptId)
+
+async function inQueue(promptId: string): Promise<boolean> {
+  const q = await (await api('/queue')).json()
+  return queued(q.queue_running, promptId) || queued(q.queue_pending, promptId)
+}
+
+export async function cancelPrompt(promptId: string) {
+  if (promptId.startsWith(CLOUD_ID)) {
+    await api(`/comfyart/cloud/cancel/${promptId.slice(CLOUD_ID.length)}`, { method: 'POST' })
+    return
+  }
+  const q = await (await api('/queue')).json()
+  const post = (path: string, body: unknown) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (queued(q.queue_pending, promptId)) await post('/queue', { delete: [promptId] })
+  else if (queued(q.queue_running, promptId)) await post('/interrupt', { prompt_id: promptId })
+}
+
+const wakers = new Map<string, Set<() => void>>()
+for (const type of ['execution_success', 'execution_error', 'execution_interrupted']) {
+  onComfyEvent(type, (d: { prompt_id?: string }) => { for (const wake of wakers.get(String(d?.prompt_id)) ?? []) wake() })
+}
+
+function nap(promptId: string) {
+  return new Promise<void>((resolve) => {
+    const set = wakers.get(promptId) ?? new Set()
+    wakers.set(promptId, set)
+    const wake = () => {
+      clearTimeout(timer)
+      set.delete(wake)
+      if (!set.size) wakers.delete(promptId)
+      resolve()
+    }
+    const timer = setTimeout(wake, POLL_MS)
+    set.add(wake)
+  })
+}
+
+export async function promptHistory(promptId: string): Promise<any> {
+  const res = promptId.startsWith(CLOUD_ID) ? await api(`/comfyart/cloud/history/${promptId.slice(CLOUD_ID.length)}`) : await api(`/history/${promptId}`)
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error?.message ?? `history failed: ${res.status}`)
+  return body[promptId]
+}
 
 async function waitForOutput<T>(promptId: string, node: string, pick: (out: Record<string, any>) => T | null): Promise<T> {
+  let misses = 0
   for (;;) {
-    const hist = (await (await api(`/history/${promptId}`)).json())[promptId]
+    const hist = await promptHistory(promptId)
     if (hist) {
-      const err = (hist.status?.messages ?? []).find((m: any) => m[0] === 'execution_error')
+      const messages: [string, any][] = hist.status?.messages ?? []
+      const err = messages.find((m) => m[0] === 'execution_error')
       if (err) throw new Error(String(err[1]?.exception_message ?? 'execution failed'))
+      if (messages.some((m) => m[0] === 'execution_interrupted')) throw new Error(t('jobs.interrupted'))
       const value = hist.outputs?.[node] ? pick(hist.outputs[node]) : null
       if (value) return value
-      if (hist.status?.completed) throw new Error('the workflow produced no output')
+      if (hist.status?.completed || hist.status?.status_str === 'error') throw new Error(t('jobs.noOutput'))
+    } else if (await inQueue(promptId)) {
+      misses = 0
+    } else if (++misses >= 2) {
+      throw new Error(t('jobs.lost'))
     }
-    await sleep(POLL_MS)
+    await nap(promptId)
   }
 }
 

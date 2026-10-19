@@ -2,6 +2,7 @@ import { atom } from 'tldraw'
 
 import { readUserJson, writeUserJson } from './comfy'
 import { uuid } from './id'
+import { readLocal, writeLocal } from './localPrefs'
 
 export type NoticeKind = 'task' | 'suggestion' | 'comment' | 'schedule'
 export interface Notice { id: string; kind: NoticeKind; title: string; body?: string; time: number; read?: boolean; project: string; chat?: string; srcs?: string[] }
@@ -18,12 +19,12 @@ export function currentProject(): string {
 }
 
 export function pushEnabled() {
-  try { return localStorage.getItem(PUSH_KEY) === '1' } catch { return false }
+  return readLocal(PUSH_KEY) === '1'
 }
 
 export async function setPush(on: boolean) {
   const next = on && (await Notification.requestPermission()) === 'granted'
-  try { localStorage.setItem(PUSH_KEY, next ? '1' : '0') } catch { }
+  writeLocal(PUSH_KEY, next ? '1' : '0')
   return next
 }
 

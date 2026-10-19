@@ -6,7 +6,7 @@ import folder_paths
 import pypdfium2
 from aiohttp import web
 
-from ._common import routes
+from ._common import bad_request, routes
 
 MAX_PAGES = 30
 RENDER_LONG = 2048
@@ -17,14 +17,14 @@ async def render_pdf(request: web.Request) -> web.Response:
     reader = await request.multipart()
     field = await reader.next()
     if field is None or field.name != "file":
-        raise web.HTTPBadRequest(text="expected a 'file' field")
+        raise bad_request("expected a 'file' field")
     data = bytes(await field.read(decode=False))
     stem = re.sub(r"[^\w\-]+", "_", Path(field.filename or "document.pdf").stem)[:40] or "document"
     limit = min(int(request.query.get("max", MAX_PAGES)), MAX_PAGES)
     try:
         pdf = pypdfium2.PdfDocument(data)
     except pypdfium2.PdfiumError as e:
-        raise web.HTTPBadRequest(text=f"not a readable PDF: {e}")
+        raise bad_request(f"not a readable PDF: {e}")
     sub = f"comfyart/pdf/{stem}-{hashlib.sha1(data).hexdigest()[:10]}"
     out = Path(folder_paths.get_input_directory()) / sub
     out.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BaseBoxShapeUtil, HTMLContainer, T, useEditor, useValue, type RecordProps, type TLShape, type TLShapeId } from 'tldraw'
 import { Icons } from '../ui/icons'
 import { t } from '../i18n'
+import { canvasBlob } from '../canvasBlob'
 
 export const LOTTIE = 'ca-lottie'
 export const MODEL = 'ca-model'
@@ -110,7 +111,7 @@ function ModelView({ shape }: { shape: ModelShape }) {
         controls.update()
         renderer.render(scene, camera)
       })
-      snapshots.set(shape.id, () => new Promise((resolve, reject) => renderer.domElement.toBlob((b) => (b ? resolve(b) : reject(new Error('export failed'))), 'image/png')))
+      snapshots.set(shape.id, () => canvasBlob(renderer.domElement))
       cleanup = () => {
         snapshots.delete(shape.id)
         resize.disconnect()

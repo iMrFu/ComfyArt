@@ -8,16 +8,15 @@ from pathlib import Path
 from typing import Optional
 
 from ._cli_common import (
-    AGENT_GUIDE,
-    COMFY_MCP_ALLOWED_TOOLS,
-    CORE_MCP_TOOLS,
     CliStreamParser,
     MCP_TOOL_TIMEOUT_MS,
     PROBE_CACHE_S,
     base_spawn_env,
     kill_process_tree,
     run_cli_turn,
+    run_command,
 )
+from .guide import AGENT_GUIDE, COMFY_MCP_ALLOWED_TOOLS, CORE_MCP_TOOLS
 from .providers import (
     AgentProvider,
     EmitFn,
@@ -175,13 +174,7 @@ class QwenCodeProvider(AgentProvider):
             self._probe_cache = (now, status)
             return status
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *argv, "--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=spawn_env(),
-            )
-            out, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+            _, out, _ = await run_command([*argv, "--version"], timeout=15, env=spawn_env())
             version = (out or b"").decode("utf-8", "replace").strip()
         except (OSError, asyncio.TimeoutError) as e:
             status = ProviderStatus(available=False, detail=f"version check failed: {e}")

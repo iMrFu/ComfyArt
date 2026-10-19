@@ -10,7 +10,6 @@ import { t } from '../i18n'
 
 const GAP = 12
 const EDGE = 8
-const MAX_DESIGNS = 24
 
 function Slider({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
@@ -31,7 +30,7 @@ export function MockupPanel({ onError }: { onError: (msg: string) => void }) {
   const designs = useValue('mockup designs', () => editor.getCurrentPageShapes().flatMap((s) => {
     const a = s.type === 'image' && (s as TLImageShape).props.assetId ? editor.getAsset((s as TLImageShape).props.assetId!) : null
     return a?.type === 'image' && a.props.src ? [a.props.src] : []
-  }).filter((src, i, all) => all.indexOf(src) === i).slice(-MAX_DESIGNS).reverse(), [editor])
+  }).filter((src, i, all) => all.indexOf(src) === i).reverse(), [editor])
   if (!shape || !rect) return null
   const p = shape.props
   const set = (patch: Partial<MockupShape['props']>) => editor.updateShape<MockupShape>({ id: shape.id, type: MOCKUP, props: patch })

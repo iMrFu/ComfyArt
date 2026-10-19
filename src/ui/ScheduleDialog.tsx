@@ -6,8 +6,10 @@ import { currentProject } from '../notices'
 import { loadSchedules, nextRun, REPEAT_LABELS, runNow, saveSchedules, schedulesAtom, schedulesOpenAtom, WEEKDAYS, type Repeat, type Schedule } from '../schedules'
 import { confirmAtom } from './Confirm'
 import { Icons } from './icons'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 import { uuid } from '../id'
+import { Modal } from './Modal'
 
 const today = () => new Date().toLocaleDateString('sv')
 
@@ -33,9 +35,7 @@ function Form({ initial, onDone }: { initial: Schedule; onDone: (s: Schedule | n
       </label>
       <div className="ca-rename__field">
         <span>{t('scheduleDialog.repeat')}</span>
-        <div className="ca-panel__chips">
-          {(Object.keys(REPEAT_LABELS) as Repeat[]).map((r) => <button key={r} type="button" className="ca-panel__chip" data-on={s.repeat === r || undefined} onClick={() => set({ repeat: r })}>{REPEAT_LABELS[r]}</button>)}
-        </div>
+        <Chips value={s.repeat} options={(Object.keys(REPEAT_LABELS) as Repeat[]).map((r) => [r, REPEAT_LABELS[r]] as const)} onPick={(r) => set({ repeat: r })} />
       </div>
       {s.repeat === 'weekly' && (
         <div className="ca-panel__chips">
@@ -76,43 +76,37 @@ export function ScheduleDialog({ editor, onError }: { editor: Editor; onError: (
   const others = schedules.length - mine.length
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename ca-memory">
-        <div className="ca-side__head">
-          <span>{editing ? t('scheduleDialog.editScheduledTask') : t('composer.scheduledTask')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
+    <Modal title={editing ? t('scheduleDialog.editScheduledTask') : t('composer.scheduledTask')} className="ca-rename ca-memory" onClose={close}>
+      {editing && (
+        <Form
+          key={editing.id}
+          initial={editing}
+          onDone={(s) => {
+            setEditing(null)
+            if (s) save(schedules.some((x) => x.id === s.id) ? schedules.map((x) => (x.id === s.id ? s : x)) : [...schedules, s])
+          }}
+        />
+      )}
+      {!editing && (
+        <div className="ca-rename__body">
+          <div className="ca-chat__hint">{t('scheduleDialog.whenItsTimeThe')}</div>
+          <button type="button" className="ca-lib__new" onClick={() => setEditing({ id: uuid().slice(0, 8), name: '', prompt: '', project: currentProject(), repeat: 'daily', time: '09:00', enabled: true, created: Date.now() })}>
+            <span className="ca-icon">{Icons.plus}</span>{t('scheduleDialog.newSchedule')}
+          </button>
+          {mine.length === 0 && <div className="ca-side__empty">{t('scheduleDialog.thisProjectHasNoScheduled')}</div>}
+          {mine.map((s) => (
+            <div key={s.id} className="ca-memory__row" data-off={!s.enabled || undefined}>
+              <span className="ca-icon">{Icons.bell}</span>
+              <span className="ca-menu__grow" title={s.prompt}>{s.name}<span className="ca-menu__key"> · {describe(s)}</span></span>
+              <button type="button" className="ca-panel__chip" data-on={s.enabled || undefined} onClick={() => save(schedules.map((x) => (x.id === s.id ? (x.enabled ? { ...x, enabled: false } : { ...x, enabled: true, lastRun: undefined, created: Date.now() }) : x)))}>{s.enabled ? t('scheduleDialog.active') : t('scheduleDialog.paused')}</button>
+              <button type="button" className="ca-history__del" title={t('scheduleDialog.runNow')} onClick={() => { close(); void runNow(editor, s).catch(fail) }}>{Icons.play}</button>
+              <button type="button" className="ca-history__del" title={t('common.edit')} onClick={() => setEditing(s)}>{Icons.textTool}</button>
+              <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => confirmAtom.set({ danger: true, title: t('scheduleDialog.deleteScheduledTask', s.name), desc: t('scheduleDialog.itWillNoLongerRun'), ok: t('common.delete'), run: () => save(schedules.filter((x) => x.id !== s.id)) })}>{Icons.trash}</button>
+            </div>
+          ))}
+          {others > 0 && <div className="ca-chat__hint">{t('scheduleDialog.othersHint', others)}</div>}
         </div>
-        {editing && (
-          <Form
-            key={editing.id}
-            initial={editing}
-            onDone={(s) => {
-              setEditing(null)
-              if (s) save(schedules.some((x) => x.id === s.id) ? schedules.map((x) => (x.id === s.id ? s : x)) : [...schedules, s])
-            }}
-          />
-        )}
-        {!editing && (
-          <div className="ca-rename__body">
-            <div className="ca-chat__hint">{t('scheduleDialog.whenItsTimeThe')}</div>
-            <button type="button" className="ca-lib__new" onClick={() => setEditing({ id: uuid().slice(0, 8), name: '', prompt: '', project: currentProject(), repeat: 'daily', time: '09:00', enabled: true, created: Date.now() })}>
-              <span className="ca-icon">{Icons.plus}</span>{t('scheduleDialog.newSchedule')}
-            </button>
-            {mine.length === 0 && <div className="ca-side__empty">{t('scheduleDialog.thisProjectHasNoScheduled')}</div>}
-            {mine.map((s) => (
-              <div key={s.id} className="ca-memory__row" data-off={!s.enabled || undefined}>
-                <span className="ca-icon">{Icons.bell}</span>
-                <span className="ca-menu__grow" title={s.prompt}>{s.name}<span className="ca-menu__key"> · {describe(s)}</span></span>
-                <button type="button" className="ca-panel__chip" data-on={s.enabled || undefined} onClick={() => save(schedules.map((x) => (x.id === s.id ? (x.enabled ? { ...x, enabled: false } : { ...x, enabled: true, lastRun: undefined, created: Date.now() }) : x)))}>{s.enabled ? t('scheduleDialog.active') : t('scheduleDialog.paused')}</button>
-                <button type="button" className="ca-history__del" title={t('scheduleDialog.runNow')} onClick={() => { close(); void runNow(editor, s).catch(fail) }}>{Icons.play}</button>
-                <button type="button" className="ca-history__del" title={t('common.edit')} onClick={() => setEditing(s)}>{Icons.textTool}</button>
-                <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => confirmAtom.set({ title: t('scheduleDialog.deleteScheduledTask', s.name), desc: t('scheduleDialog.itWillNoLongerRun'), ok: t('common.delete'), run: () => save(schedules.filter((x) => x.id !== s.id)) })}>{Icons.trash}</button>
-              </div>
-            ))}
-            {others > 0 && <div className="ca-chat__hint">{t('scheduleDialog.othersHint', others)}</div>}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }

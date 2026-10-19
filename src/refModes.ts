@@ -1,4 +1,4 @@
-import type { PromptGraph } from './comfy'
+import { queuePrompt, viewUrl, waitForImages, type PromptGraph } from './comfy'
 import type { ModelDef } from './models'
 import type { GeneratorShape } from './shapes/GeneratorShape'
 import { annotated } from './workflows'
@@ -38,6 +38,19 @@ export const REF_MODES: RefMode[] = [
 
 export const DEFAULT_STRENGTH = 80
 
+export interface RefControl { start: number; end: number; res: number; resize: 'crop' | 'stretch' }
+export const DEFAULT_CONTROL: RefControl = { start: 0, end: 100, res: RES, resize: 'crop' }
+export const CONTROL_RESOLUTIONS = [512, 1024, 2048]
+
+export function refControlsOf(shape: GeneratorShape): Record<string, RefControl> {
+  return (shape.meta.refControls as Record<string, RefControl> | undefined) ?? {}
+}
+
+export function preprocessNode(mode: RefMode, image: unknown, res: number) {
+  const [type, inputs] = mode.node!
+  return { class_type: type, inputs: { image, ...inputs, ...('resolution' in inputs ? { resolution: res } : {}) } }
+}
+
 export const PALETTE_MODE: RefMode = { id: 'palette', label: '', group: '', hint: 'Image {n} is only a color swatch: use its colors as the palette and ignore its layout, shapes and pattern.' }
 
 export const modeOf = (id: string | undefined) => REF_MODES.find((m) => m.id === id) ?? REF_MODES[0]
@@ -50,8 +63,22 @@ export function refStrengthsOf(shape: GeneratorShape): Record<string, number> {
   return (shape.meta.refStrengths as Record<string, number> | undefined) ?? {}
 }
 
+const QWEN_EDIT_IMAGES = 16
+
+export const refLimit = (model: ModelDef) => (model.refs === 'qwen' ? QWEN_EDIT_IMAGES : Infinity)
+
 export function modesFor(model: ModelDef): RefMode[] {
   return model.refs ? REF_MODES : model.control ? REF_MODES.filter((m) => m.control) : []
+}
+
+export async function previewControl(src: string, mode: RefMode, res: number): Promise<string> {
+  const graph: PromptGraph = {
+    r: { class_type: 'LoadImage', inputs: { image: annotated(src) } },
+    x: preprocessNode(mode, ['r', 0], res),
+    o: { class_type: 'PreviewImage', inputs: { images: ['x', 0] } },
+  }
+  const [ref] = await waitForImages(await queuePrompt(graph), 'o')
+  return viewUrl(ref)
 }
 
 export interface UsedRef { src: string; mode: RefMode }
@@ -72,11 +99,11 @@ export function refHints(used: UsedRef[]): string[] {
   return used.map(({ mode }, i) => mode.hint.replace('{n}', String(i + 1))).filter(Boolean)
 }
 
-export function applyRefs(graph: PromptGraph, model: ModelDef, used: UsedRef[], strengths: Record<string, number>, width: number, height: number) {
+export function applyRefs(graph: PromptGraph, model: ModelDef, used: UsedRef[], strengths: Record<string, number>, controls: Record<string, RefControl>, width: number, height: number) {
   const images = used.map(({ src, mode }, i) => {
     graph[`r${i}`] = { class_type: 'LoadImage', inputs: { image: annotated(src) } }
     if (!mode.node) return { id: `r${i}`, mode, src }
-    graph[`x${i}`] = { class_type: mode.node[0], inputs: { image: [`r${i}`, 0], ...mode.node[1] } }
+    graph[`x${i}`] = preprocessNode(mode, [`r${i}`, 0], (controls[src] ?? DEFAULT_CONTROL).res)
     return { id: `x${i}`, mode, src }
   })
   if (model.refs === 'qwen' && images.length) {
@@ -94,13 +121,14 @@ export function applyRefs(graph: PromptGraph, model: ModelDef, used: UsedRef[], 
     })
     Object.assign(graph['11'].inputs, { positive: pos, negative: neg })
   }
-  const controls = images.filter(({ mode }) => mode.control)
-  if (model.control && controls.length) {
+  const hints = images.filter(({ mode }) => mode.control)
+  if (model.control && hints.length) {
     graph.cn = { class_type: 'ControlNetLoader', inputs: { control_net_name: model.control } }
     let [pos, neg]: [unknown, unknown] = [graph['7'].inputs.positive, graph['7'].inputs.negative]
-    controls.forEach(({ id, src }, i) => {
-      graph[`cs${i}`] = { class_type: 'ImageScale', inputs: { image: [id, 0], upscale_method: 'lanczos', width, height, crop: 'center' } }
-      graph[`ca${i}`] = { class_type: 'ControlNetApplyAdvanced', inputs: { positive: pos, negative: neg, control_net: ['cn', 0], image: [`cs${i}`, 0], vae: [model.vae!, 0], strength: (strengths[src] ?? DEFAULT_STRENGTH) / 100, start_percent: 0, end_percent: 1 } }
+    hints.forEach(({ id, src }, i) => {
+      const c = controls[src] ?? DEFAULT_CONTROL
+      graph[`cs${i}`] = { class_type: 'ImageScale', inputs: { image: [id, 0], upscale_method: 'lanczos', width, height, crop: c.resize === 'crop' ? 'center' : 'disabled' } }
+      graph[`ca${i}`] = { class_type: 'ControlNetApplyAdvanced', inputs: { positive: pos, negative: neg, control_net: ['cn', 0], image: [`cs${i}`, 0], vae: [model.vae!, 0], strength: (strengths[src] ?? DEFAULT_STRENGTH) / 100, start_percent: c.start / 100, end_percent: c.end / 100 } }
       ;[pos, neg] = [[`ca${i}`, 0], [`ca${i}`, 1]]
     })
     Object.assign(graph['7'].inputs, { positive: pos, negative: neg })

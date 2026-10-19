@@ -1,6 +1,9 @@
 import { cloneElement, type CSSProperties, type ReactElement } from 'react'
 import { FrameShapeUtil, Vec, type Editor, type SvgExportContext, type TLFrameShape, type TLShapeId } from 'tldraw'
 
+import { t } from '../i18n'
+import { canvasBlob } from '../canvasBlob'
+
 export interface ArtboardStyle { fill?: string; stroke?: string; radius?: number }
 
 const ARC_STEPS = 6
@@ -49,9 +52,7 @@ export async function exportImage(editor: Editor, ids: TLShapeId[], opts: ImageO
     ctx.stroke()
   }
   const type = MIME[opts.format as keyof typeof MIME] ?? MIME.png
-  const out = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, type))
-  if (!out) throw new Error('export failed')
-  return { blob: out, width, height }
+  return { blob: await canvasBlob(c, type), width, height }
 }
 
 export class ArtboardShapeUtil extends FrameShapeUtil.configure({
@@ -62,7 +63,13 @@ export class ArtboardShapeUtil extends FrameShapeUtil.configure({
 }) {
   override component(shape: TLFrameShape) {
     const r = radiusOf(shape)
-    return <div style={{ display: 'contents', '--ca-frame-r': `${r}px` } as CSSProperties}>{super.component(shape)}</div>
+    const empty = shape.meta.refFrame === true && !this.editor.getSortedChildIdsForParent(shape.id).length
+    return (
+      <div style={{ display: 'contents', '--ca-frame-r': `${r}px` } as CSSProperties}>
+        {super.component(shape)}
+        {empty && <div className="ca-reframe__hint">{t('chatFrame.dropHint')}</div>}
+      </div>
+    )
   }
 
   override toSvg(shape: TLFrameShape, ctx: SvgExportContext) {

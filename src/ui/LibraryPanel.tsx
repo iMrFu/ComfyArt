@@ -4,7 +4,7 @@ import { atom, useValue, type Editor } from 'tldraw'
 import { kitsAtom } from '../agent'
 import { placeAsset } from '../assets'
 import { KIND_LABELS, libraryAtom, saveLibrary, type LibraryItem, type LibraryKind } from '../library'
-import { openProject } from '../projects'
+import { newProject } from '../projects'
 import { AssetGrid } from './AssetPicker'
 import { confirmAtom } from './Confirm'
 import { Icons } from './icons'
@@ -34,14 +34,14 @@ function LibCard({ item, save }: { item: LibraryItem; save: (list: LibraryItem[]
           <Popover open={menu} onOpenChange={setMenu} align="end" trigger={({ open, toggle }) => <button type="button" className="ca-lib__more" data-open={open || undefined} title={t('home.more')} onClick={toggle}><span className="ca-icon">{Icons.more}</span></button>}>
             <div className="ca-menu ca-lib__menu">
               <button type="button" className="ca-menu__item" disabled={kits.some((k) => k.id === item.id)} onClick={act(() => kitsAtom.set([...kitsAtom.get(), item]))}>{t('libraryPanel.addToChat')}</button>
-              {brand && <button type="button" className="ca-menu__item" onClick={act(() => openProject(uuid().slice(0, 8), item.id))}>{t('libraryPanel.designWithThisKitNew')}</button>}
+              {brand && <button type="button" className="ca-menu__item" onClick={act(() => newProject({ kit: item.id }))}>{t('libraryPanel.designWithThisKitNew')}</button>}
               {brand && (
                 <button type="button" className="ca-menu__item" onClick={act(() => save(all().map((x) => (x.kind === 'brand' ? { ...x, isDefault: x.id === item.id ? !item.isDefault : false } : x))))}>
                   <span className="ca-menu__grow">{t('libraryPanel.setAsDefaultForNew')}</span>{item.isDefault && <span className="ca-icon">{Icons.check}</span>}
                 </button>
               )}
               <button type="button" className="ca-menu__item" onClick={act(() => save([...all(), { ...item, id: uuid().slice(0, 8), name: t('libraryPanel.copy', name), isDefault: false }]))}>{t('common.duplicate')}</button>
-              <button type="button" className="ca-menu__item ca-menu__item--danger" onClick={act(() => confirmAtom.set({ title: t('libraryPanel.deleteItem', KIND_LABELS[item.kind]), desc: t('libraryPanel.itemWillBeRemoved', name), ok: t('common.delete'), run: () => save(all().filter((x) => x.id !== item.id)) }))}>{t('common.delete')}</button>
+              <button type="button" className="ca-menu__item ca-menu__item--danger" onClick={act(() => confirmAtom.set({ danger: true, title: t('libraryPanel.deleteItem', KIND_LABELS[item.kind]), desc: t('libraryPanel.itemWillBeRemoved', name), ok: t('common.delete'), run: () => save(all().filter((x) => x.id !== item.id)) }))}>{t('common.delete')}</button>
             </div>
           </Popover>
         </span>

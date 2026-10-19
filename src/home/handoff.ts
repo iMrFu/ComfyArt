@@ -50,7 +50,7 @@ export async function takeHandoff(editor: Editor, onError: ErrorSink) {
     return
   }
   await refreshBot()
-  if (mode !== 'agent') return generateDirect(editor, text, shapes, mode === 'video', onError)
+  if (mode !== 'agent') return generateDirect(editor, text, [{ refs: shapes, prompt: text }], mode === 'video', onError)
   skillAtom.set(null)
   await sendToAgent(editor, text, shapes, skill)
 }

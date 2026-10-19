@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import { CopyButton } from './CopyButton'
+
 const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g
 
 function inline(text: string): ReactNode[] {
@@ -20,7 +22,7 @@ export function Markdown({ text }: { text: string }) {
     if (line.startsWith('```')) {
       const body: string[] = []
       while (++i < lines.length && !lines[i].startsWith('```')) body.push(lines[i])
-      out.push(<pre key={i}>{body.join('\n')}</pre>)
+      out.push(<div key={i} className="ca-md__code"><pre>{body.join('\n')}</pre><CopyButton text={body.join('\n')} /></div>)
       continue
     }
     if (line.trim().startsWith('|')) {

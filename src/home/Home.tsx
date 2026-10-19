@@ -5,7 +5,7 @@ import { botEnabledAtom, loadProviders } from '../bot'
 import { thumbUrl, uploadImage, viewUrl } from '../comfy'
 import { t } from '../i18n'
 import { errorText } from '../jobs'
-import { newProjectId, openView, projectUrl, type ProjectEntry } from '../projects'
+import { newProject, openView, type ProjectEntry } from '../projects'
 import { loadSkills, type Skill } from '../skills'
 import { Icons } from '../ui/icons'
 import { isEnter } from '../ui/keys'
@@ -24,10 +24,6 @@ const QUICK: [keyof typeof Icons, string, string][] = [
 ]
 const MODES: [AgentMode, string, keyof typeof Icons][] = [['agent', 'Agent', 'agent'], ['image', t('composer.image'), 'genImage'], ['video', t('common.video'), 'genVideo']]
 
-function start(params: Record<string, string | string[]>) {
-  location.assign(projectUrl(newProjectId(), params))
-}
-
 export function Home() {
   const [text, setText] = useState('')
   const [refs, setRefs] = useState<string[]>([])
@@ -39,6 +35,7 @@ export function Home() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const [drop, setDrop] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const file = useRef<HTMLInputElement>(null)
   const breakdown = useRef<HTMLInputElement>(null)
@@ -58,12 +55,12 @@ export function Home() {
 
   const send = () => {
     if (!text.trim() || uploading) return
-    start({ ask: text.trim(), mode, ref: refs })
+    newProject({ ask: text.trim(), mode, ref: refs })
   }
   const upload = async (files: FileList | null) => {
     setUploading(true)
     try {
-      for (const f of Array.from(files ?? [])) {
+      for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith('image/'))) {
         const src = viewUrl(await uploadImage(f, f.name))
         setRefs((r) => (r.includes(src) ? r : [...r, src]))
       }
@@ -77,7 +74,7 @@ export function Home() {
     if (!f) return
     setUploading(true)
     try {
-      start({ ref: viewUrl(await uploadImage(f, f.name)), tool: 'elements' })
+      newProject({ ref: viewUrl(await uploadImage(f, f.name)), tool: 'elements' })
     } catch (e) {
       setError(errorText(e))
       setUploading(false)
@@ -89,7 +86,13 @@ export function Home() {
   return (
     <div className="ca-landing">
       <h1 className="ca-landing__title">{t('home.whatToDesign')}</h1>
-      <div className="ca-landing__box">
+      <div
+        className="ca-landing__box"
+        data-drop={drop || undefined}
+        onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDrop(true) } }}
+        onDragLeave={() => setDrop(false)}
+        onDrop={(e) => { e.preventDefault(); setDrop(false); void upload(e.dataTransfer.files) }}
+      >
         {refs.length > 0 && (
           <div className="ca-landing__refs">
             {refs.map((src) => (
@@ -163,7 +166,7 @@ export function Home() {
           {skills.map((s) => {
             const cover = Object.values(s.images ?? {})[0]
             return (
-              <button key={s.id} type="button" className="ca-skillcard" onClick={() => start({ skill: s.id })}>
+              <button key={s.id} type="button" className="ca-skillcard" onClick={() => newProject({ skill: s.id })}>
                 <span className="ca-skillcard__icon">{cover ? <img src={thumbUrl(cover, 128)} alt="" /> : <span className="ca-icon">{Icons.skill}</span>}</span>
                 <span className="ca-skillcard__name">{s.name}</span>
                 <span className="ca-model__tag">{s.custom ? t('home.mySkill') : t('home.builtIn')}</span>

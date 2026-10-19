@@ -71,7 +71,8 @@ def _install_stubs() -> None:
     ps.port = 8188
     ps.user_manager = _UserManager()
     ps.prompt_queue = _Queue()
-    ps.send_sync = lambda event, data, sid=None: SENT.append((event, data))
+    ps.sockets = {}
+    ps.send_sync = lambda event, data, sid=None: SENT.append((event, {**data, "_sid": sid} if sid else data))
     _PromptServer.instance = ps
     _make_module("server", PromptServer=_PromptServer)
 
@@ -91,6 +92,8 @@ def fresh_user_dir(tmp_path):
     import folder_paths
     folder_paths.STATE["base"] = tmp_path
     SENT.clear()
+    from server import PromptServer
+    PromptServer.instance.sockets.clear()
     yield tmp_path
 
 

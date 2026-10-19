@@ -2,21 +2,19 @@ import asyncio
 import json
 import logging
 import os
-import shutil
-import sys
+import re
 import time
-from pathlib import Path
 from typing import Callable, Optional
 
 import aiohttp
 
 from ._cli_common import (
-    AGENT_GUIDE,
-    CORE_MCP_TOOLS,
     PROBE_CACHE_S,
     TOOL_RESULT_CAP,
     merge_usage,
 )
+from . import lms
+from .guide import AGENT_GUIDE, CORE_MCP_TOOLS
 from .providers import (
     AgentProvider,
     BotEvent,
@@ -36,6 +34,7 @@ _MAX_ITERATIONS = 80
 _MAX_WAIT_SLICES = 12
 _LLM_TIMEOUT_S = 300
 _HISTORY_CHAR_CAP = 16_000
+_THINK_RE = re.compile(r"(?:<think>|^)([\s\S]*?)</think>|<think>([\s\S]*)$")
 
 _SYSTEM_PROMPT = AGENT_GUIDE
 
@@ -144,62 +143,6 @@ class LocalLlmProvider(AgentProvider):
         except _NET_ERRORS:
             return []
 
-    def _lms_bin(self) -> str:
-        executable = "lms.exe" if os.name == "nt" else "lms"
-        candidates = [
-            os.getenv("LMSTUDIO_LMS_PATH", ""),
-            str(Path.home() / ".lmstudio" / "bin" / executable),
-            "/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms"
-            if sys.platform == "darwin" else "",
-            shutil.which("lms") or "",
-        ]
-        for candidate in candidates:
-            if candidate and Path(candidate).is_file():
-                return candidate
-        return ""
-
-    async def _run_lms(self, args: list[str], timeout: float = 600) -> str:
-        binary = self._lms_bin()
-        if not binary:
-            raise RuntimeError("lms executable not found")
-        process = await asyncio.create_subprocess_exec(
-            binary, *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
-            raise RuntimeError(f"lms {' '.join(args)} timed out")
-        if process.returncode != 0:
-            detail = "\n".join(part for part in (
-                stdout.decode("utf-8", "replace").strip(),
-                stderr.decode("utf-8", "replace").strip()) if part)
-            raise RuntimeError(f"lms {' '.join(args)} failed: {detail}")
-        return stdout.decode("utf-8", "replace").strip()
-
-    async def _unload_model(self) -> bool:
-        try:
-            await self._run_lms(["unload", "--all"], timeout=60)
-            return True
-        except (OSError, RuntimeError) as e:
-            _log.warning("[ComfyArt/local-llm] model unload failed: %s", e)
-            return False
-
-    async def _reload_model(self, model: str) -> None:
-        if not model:
-            return
-        try:
-            await self._run_lms([
-                "load", model, "--identifier", model,
-                "--gpu", "max", "--yes",
-            ])
-        except (OSError, RuntimeError) as e:
-            _log.warning("[ComfyArt/local-llm] model reload failed: %s", e)
-
     async def _mcp_list_tools(self, session: aiohttp.ClientSession,
                               endpoint: str) -> list[dict]:
         data = await self._request_json(
@@ -274,7 +217,7 @@ class LocalLlmProvider(AgentProvider):
                                handle: TurnHandle) -> str:
         args = dict(args)
         args.setdefault("timeout_s", 170)
-        unloaded = bool(self._lms_bin()) and await self._unload_model()
+        unloaded = bool(lms.lms_bin()) and await lms.unload_models()
         try:
             raw = ""
             for _ in range(_MAX_WAIT_SLICES):
@@ -291,7 +234,7 @@ class LocalLlmProvider(AgentProvider):
             return raw
         finally:
             if unloaded:
-                await self._reload_model(model)
+                await lms.load_model(model)
 
     async def send(self, turn: TurnRequest, emit: EmitFn,
                    handle: TurnHandle) -> TurnResult:
@@ -339,8 +282,13 @@ class LocalLlmProvider(AgentProvider):
                     usage = merge_usage(usage, data.get("usage"))
                     message = (data.get("choices") or [{}])[0].get("message") or {}
                     content = self._extract_text(message.get("content") or "")
+                    thought = _THINK_RE.search(content)
+                    reasoning = str(message.get("reasoning_content") or message.get("reasoning") or "") or (thought.group(1) or thought.group(2) or "" if thought else "")
+                    content = _THINK_RE.sub("", content).strip()
                     tool_calls = message.get("tool_calls") or []
 
+                    if reasoning.strip():
+                        await emit(BotEvent(t="thinking", text=reasoning.strip()))
                     if content:
                         await emit(BotEvent(t="delta", text=content))
                     if not tool_calls:

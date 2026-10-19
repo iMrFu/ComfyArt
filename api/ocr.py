@@ -4,8 +4,7 @@ from functools import lru_cache
 from aiohttp import web
 from rapidocr import RapidOCR
 
-from ._common import error, json_body, routes
-from .bot_media import view_path
+from ._common import error, json_body, routes, view_path
 
 
 @lru_cache(maxsize=1)

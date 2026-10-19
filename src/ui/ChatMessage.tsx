@@ -8,8 +8,8 @@ import { schedulesOpenAtom } from '../schedules'
 import { Icons } from './icons'
 import { Markdown } from './Markdown'
 import { Thumb } from './TaskDetails'
+import { CopyButton } from './CopyButton'
 import { t } from '../i18n'
-import { copyText } from '../clipboard'
 
 const GEN_TOOLS = new Set(['generate_image', 'generate_video', 'edit_image', 'animate_image', 'upscale_image', 'remove_background', 'expand_image', 'split_layers', 'change_angle', 'replace_text', 'edit_region', 'erase_region', 'move_object', 'style_transfer', 'extend_video', 'upscale_video', 'remove_video_background', 'generate_music', 'generate_sound_effect', 'text_to_speech', 'image_to_3d', 'edit_elements', 'create_mockup', 'create_slides'])
 
@@ -113,6 +113,21 @@ function Plan({ b, live }: { b: BotBlock; live: boolean }) {
   )
 }
 
+function Thought({ text, live }: { text: string; live: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="ca-chat__tool ca-chat__thought" data-open={open || undefined}>
+      <button type="button" className="ca-chat__step" onClick={() => setOpen(!open)}>
+        <span className="ca-icon">{Icons.agent}</span>
+        <span>{live ? t('chatMessage.thinking') : t('chatMessage.thought')}</span>
+        {!open && <span className="ca-chat__arg">{text.trim().split('\n').at(-1)}</span>}
+        <span className="ca-chat__chev ca-icon">{Icons.chevron}</span>
+      </button>
+      {open && <div className="ca-chat__io ca-chat__thoughttext">{text.trim()}</div>}
+    </div>
+  )
+}
+
 type Pair = { use: BotBlock; result?: BotBlock; i: number }
 
 function StepGroup({ editor, steps }: { editor: Editor; steps: Pair[] }) {
@@ -156,6 +171,7 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
     else if (b.type !== 'tool_result') {
       flush()
       if (b.type === 'text') items.push(<Markdown key={i} text={b.text ?? ''} />)
+      if (b.type === 'thinking' && b.text?.trim()) items.push(<Thought key={i} text={b.text} live={!done && i === m.blocks.length - 1} />)
       if (b.type === 'tool_use') items.push(<Step key={i} editor={editor} use={b} result={resultOf(b, i)} />)
       if (b.type === 'ask') items.push(<Ask key={b.ask_id ?? i} b={b} />)
       if (b.type === 'task') items.push(<Task key={i} editor={editor} b={b} />)
@@ -169,18 +185,19 @@ export function AssistantBlocks({ editor, m }: { editor: Editor; m: BotMessage }
 
 export function UserMessage({ editor, m, onBranch }: { editor: Editor; m: BotMessage; onBranch?: () => void }) {
   const text = textOf(m)
-  const media = m.blocks.filter((b) => b.type === 'image' || b.type === 'video')
+  const media = m.blocks.filter((b) => b.type === 'image' || b.type === 'video' || b.type === 'audio')
   return (
     <div className="ca-chat__user" data-queued={m.status === 'queued' || undefined}>
       <div className="ca-chat__acts">
         <button type="button" className="ca-history__del" title={t('chatMessage.editAgain')} onClick={() => draftAtom.set(text)}>{Icons.textTool}</button>
-        <button type="button" className="ca-history__del" title={t('common.copy')} onClick={() => void copyText(text)}>{Icons.page}</button>
+        <CopyButton text={text} />
         <button type="button" className="ca-history__del" title={t('chatMessage.setAsScheduledTask')} onClick={() => schedulesOpenAtom.set({ prompt: text })}>{Icons.bell}</button>
         {onBranch && <button type="button" className="ca-history__del" title={t('chatMessage.forkNewChatFromHere')} onClick={onBranch}>{Icons.merge}</button>}
       </div>
       {media.length > 0 && <div className="ca-chat__thumbs">{media.map((b) => <Thumb key={b.url} editor={editor} src={b.url!} />)}</div>}
       {m.blocks.filter((b) => b.type === 'skill').map((b) => <span key={b.name} className="ca-chip"><span className="ca-icon">{Icons.skill}</span>{b.name}</span>)}
       {m.blocks.filter((b) => b.type === 'kit').map((b) => <span key={b.name} className="ca-chip"><span className="ca-icon">{Icons.assets}</span>{b.name}</span>)}
+      {m.blocks.filter((b) => b.type === 'file').map((b) => <a key={b.url} className="ca-chip" href={b.url} target="_blank" rel="noreferrer"><span className="ca-icon">{Icons.page}</span>{b.name}</a>)}
       {text && <div className="ca-chat__bubble">{text}</div>}
       {m.status === 'queued' && <span className="ca-chat__hint">{t('chatMessage.queuedSendsAfterTheCurrent')}</span>}
     </div>

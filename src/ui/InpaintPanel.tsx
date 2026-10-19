@@ -8,7 +8,9 @@ import { errorText } from '../jobs'
 import { annotated, samGraph } from '../workflows'
 import { exitMode, modeAtom } from './mode'
 import { useElementSize, useSelectedImage, useSelectionRect } from './selection'
+import { Chips } from './Chips'
 import { t } from '../i18n'
+import { useEscape } from './escape'
 
 const GAP = 12
 const EDGE = 8
@@ -106,12 +108,7 @@ export function InpaintPanel({ onError }: { onError: (msg: string) => void }) {
     }
   }, [version, tool, offset, img])
 
-  useEffect(() => {
-    if (!active) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); exitMode() } }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [active])
+  useEscape(active, exitMode)
 
   useEffect(() => {
     if (active && !shape) exitMode()
@@ -243,9 +240,7 @@ export function InpaintPanel({ onError }: { onError: (msg: string) => void }) {
       {cursor && (tool === 'brush' || tool === 'eraser') && <div className="ca-erase__cursor" style={{ left: cursor[0] - brush / 2, top: cursor[1] - brush / 2, width: brush, height: brush }} />}
       <div ref={panel} className="ca-panel" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
         <div className="ca-panel__head"><span>{move ? t('common.moveObject') : t('common.inpaint')}</span>{busy && <span className="ca-trim__time">{t('inpaintPanel.autoSelecting')}</span>}</div>
-        <div className="ca-panel__chips">
-          {tools.map(([t, label]) => <button key={t} type="button" className="ca-panel__chip" data-on={tool === t || undefined} onClick={() => setTool(t)}>{label}</button>)}
-        </div>
+        <Chips value={tool} options={tools} onPick={setTool} />
         {(tool === 'brush' || tool === 'eraser') && (
           <label className="ca-panel__row"><span>{t('inpaintPanel.brushSize')}</span><input type="range" min={4} max={200} value={brush} onChange={(e) => setBrush(Number(e.target.value))} /><span className="ca-panel__val">{brush}</span></label>
         )}
@@ -265,9 +260,7 @@ export function InpaintPanel({ onError }: { onError: (msg: string) => void }) {
         {move && <div className="ca-chat__hint">{tool === 'drag' ? t('inpaintPanel.dragTheSelectionToThe') : t('inpaintPanel.firstCircleTheObjectTo')}</div>}
         {!move && <label className="ca-panel__row"><span>{t('inpaintPanel.feather')}</span><input type="range" min={0} max={40} value={feather} onChange={(e) => setFeather(Number(e.target.value))} /><span className="ca-panel__val">{feather}</span></label>}
         {!move && (
-          <div className="ca-panel__chips">
-            {INPAINT_STYLES.map(([label, value]) => <button key={label} type="button" className="ca-panel__chip" data-on={style === value || undefined} onClick={() => setStyle(value)}>{label}</button>)}
-          </div>
+          <Chips value={style} options={INPAINT_STYLES.map(([label, value]) => [value, label] as const)} onPick={setStyle} />
         )}
         {!move && <textarea
           className="ca-panel__prompt ca-panel__prompt--boxed"

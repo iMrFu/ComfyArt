@@ -1,8 +1,7 @@
 import { createShapeId, type Editor, type TLFrameShape, type TLShape, type TLShapeId } from 'tldraw'
 
 import { uploadImage, viewUrl } from './comfy'
-import { freeSpot } from './generate'
-import { spawnHolder, startJob, type ErrorSink } from './jobs'
+import { freeSpot, spawnHolder, startJob, type ErrorSink } from './jobs'
 import { download } from './psd'
 import { exportImage } from './shapes/ArtboardShape'
 import { GENBLOCK, QR, type GenBlockShape } from './shapes/ComposeShapes'

@@ -108,7 +108,7 @@ class TestProjectSettings:
         assert "comfyart" in data["mcpServers"]
 
     def test_mounts_comfy_mcp_when_given(self, tmp_path):
-        from ComfyArt.bot._cli_common import COMFY_MCP_ALLOWED_TOOLS
+        from ComfyArt.bot.guide import COMFY_MCP_ALLOWED_TOOLS
         path = write_project_settings(str(tmp_path), "http://x/mcp",
                                       ["comfy-mcp", "--debug"])
         data = json.loads(path.read_text(encoding="utf-8"))

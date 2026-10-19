@@ -8,6 +8,7 @@ import { ColorPicker } from './ColorPicker'
 import { exitMode, modeAtom } from './mode'
 import { useElementSize, useSelectedImage, useSelectionRect } from './selection'
 import { t } from '../i18n'
+import { useEscape } from './escape'
 
 const GAP = 12
 const EDGE = 8
@@ -79,12 +80,7 @@ export function AdjustPanel({ onError }: { onError: (msg: string) => void }) {
     ctx.drawImage(out, sx, sy, sw, sh, 0, 0, c.width, c.height)
   }, [img, adjust, crop, flip])
 
-  useEffect(() => {
-    if (!active) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); exitMode() } }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [active])
+  useEscape(active, exitMode)
 
   useEffect(() => {
     if (active && !shape) exitMode()

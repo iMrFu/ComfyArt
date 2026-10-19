@@ -8,7 +8,9 @@ import { Icons } from './icons'
 import { exitMode, modeAtom } from './mode'
 import { Popover } from './Popover'
 import { useElementSize, useSelectedImage, useSelectionRect } from './selection'
+import { Chips } from './Chips'
 import { t } from '../i18n'
+import { useEscape } from './escape'
 
 const GAP = 12
 const EDGE = 8
@@ -33,12 +35,7 @@ export function StylePanel({ onError }: { onError: (msg: string) => void }) {
 
   useEffect(() => { setRef(null) }, [active])
   useEffect(() => { if (active && !shape) exitMode() }, [active, shape])
-  useEffect(() => {
-    if (!active) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); exitMode() } }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [active])
+  useEscape(active, exitMode)
 
   if (!active || !shape || !rect) return null
   const host = editor.getContainer().getBoundingClientRect()
@@ -75,9 +72,7 @@ export function StylePanel({ onError }: { onError: (msg: string) => void }) {
       {!ref && (
         <>
           <div className="ca-gen__label">{t('stylePanel.orChooseAStyle')}</div>
-          <div className="ca-panel__chips">
-            {STYLES.map(([label, value]) => <button key={value} type="button" className="ca-panel__chip" data-on={style === value || undefined} onClick={() => setStyle(value)}>{label}</button>)}
-          </div>
+          <Chips value={style} options={STYLES.map(([label, value]) => [value, label] as const)} onPick={setStyle} />
         </>
       )}
       <div className="ca-panel__foot">

@@ -1,12 +1,12 @@
 import { atom } from 'tldraw'
 
+import { readLocal, writeLocal } from '../localPrefs'
+
 const KEY = 'comfyart.dock'
 
-export const dockAtom = atom<'left' | 'right'>('chat dock', (() => {
-  try { return localStorage.getItem(KEY) === 'right' ? 'right' : 'left' } catch { return 'left' }
-})())
+export const dockAtom = atom<'left' | 'right'>('chat dock', readLocal(KEY) === 'right' ? 'right' : 'left')
 
 export function setDock(side: 'left' | 'right') {
   dockAtom.set(side)
-  try { localStorage.setItem(KEY, side) } catch { }
+  writeLocal(KEY, side)
 }

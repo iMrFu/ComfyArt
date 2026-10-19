@@ -3,11 +3,18 @@ from __future__ import annotations
 import asyncio
 
 from conftest import SENT, write_settings
+from server import PromptServer
 
 from ComfyArt.api import chat_store, mcp_commands
+from ComfyArt.api.mcp_tools import bot_tools
 from ComfyArt.api.bot_turns import ACTIVE_TURNS, _TurnState
-from ComfyArt.bot._cli_common import CORE_MCP_TOOLS
+from ComfyArt.bot.guide import CORE_MCP_TOOLS
 from ComfyArt.bot.providers import TurnHandle
+
+
+async def _open(client, project="p", tab="tab-1"):
+    PromptServer.instance.sockets[tab] = object()
+    await client.post("/comfyart/mcp_page", json={"client_id": tab, "project": project})
 
 
 def _rpc(method, params=None, rid=1):
@@ -35,24 +42,27 @@ async def test_mcp_is_off_by_default(bot_client):
 async def test_tools_list_matches_the_core_list(bot_client):
     tools = (await (await bot_client.post("/comfyart/mcp", json=_rpc("tools/list"))).json())["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == set(CORE_MCP_TOOLS) - {"ask_user", "update_plan"}
+    assert names == set(CORE_MCP_TOOLS) - set(bot_tools.TOOLS)
     chat = chat_store.create_chat(user="default", project="p", provider="codex")
     with_chat = await (await bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}", json=_rpc("tools/list"))).json()
-    assert {"ask_user", "update_plan"} <= {t["name"] for t in with_chat["result"]["tools"]}
+    assert set(bot_tools.TOOLS) <= {t["name"] for t in with_chat["result"]["tools"]}
 
 
 async def test_canvas_tool_is_relayed_to_the_project_page(bot_client):
+    await _open(bot_client, "other", "tab-0")
+    await _open(bot_client, "proj-7")
     chat = chat_store.create_chat(user="default", project="proj-7", provider="codex")
     call = asyncio.create_task(bot_client.post(f"/comfyart/mcp?bot_chat={chat['id']}",
                                                json=_rpc("tools/call", {"name": "get_canvas", "arguments": {}})))
     commands = await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"shapes": [], "page": "page:1"}})
     data = await (await call).json()
-    assert commands[0]["action"] == "get_canvas" and commands[0]["project"] == "proj-7"
+    assert commands[0]["action"] == "get_canvas" and commands[0]["project"] == "proj-7" and commands[0]["_sid"] == "tab-1"
     assert data["result"]["isError"] is False
     assert '"page": "page:1"' in data["result"]["content"][0]["text"]
 
 
 async def test_view_canvas_png_becomes_an_image_block(bot_client):
+    await _open(bot_client)
     call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "view_canvas", "arguments": {}})))
     await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"width": 4, "png": "QUJD"}})
     content = (await (await call).json())["result"]["content"]
@@ -61,6 +71,7 @@ async def test_view_canvas_png_becomes_an_image_block(bot_client):
 
 
 async def test_list_models_keeps_its_image_field(bot_client):
+    await _open(bot_client)
     call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "list_models", "arguments": {}})))
     await _answer_commands(bot_client, lambda c: {"ok": True, "result": {"image": [{"id": "m"}], "video": []}})
     content = (await (await call).json())["result"]["content"]
@@ -68,17 +79,39 @@ async def test_list_models_keeps_its_image_field(bot_client):
 
 
 async def test_page_errors_come_back_as_tool_errors(bot_client):
+    await _open(bot_client)
     call = asyncio.create_task(bot_client.post("/comfyart/mcp", json=_rpc("tools/call", {"name": "focus", "arguments": {"ids": ["x"]}})))
     await _answer_commands(bot_client, lambda c: {"ok": False, "error": "no shape x"})
     result = (await (await call).json())["result"]
     assert result["isError"] is True and "no shape x" in result["content"][0]["text"]
 
 
-async def test_no_page_times_out_with_a_clear_error(monkeypatch):
+async def test_no_open_page_fails_at_once():
+    try:
+        await mcp_commands.submit_command("get_canvas", {}, "p", timeout=5)
+    except ValueError as e:
+        assert "not open in any browser tab" in str(e)
+    else:
+        raise AssertionError("expected an error")
+
+
+async def test_without_a_project_several_open_projects_are_ambiguous(bot_client):
+    await _open(bot_client, "a", "tab-a")
+    await _open(bot_client, "b", "tab-b")
+    try:
+        await mcp_commands.submit_command("get_canvas", {}, "", timeout=5)
+    except ValueError as e:
+        assert "several ComfyArt projects" in str(e)
+    else:
+        raise AssertionError("expected an error")
+
+
+async def test_slow_page_times_out_without_claiming_it_is_closed(bot_client):
+    await _open(bot_client)
     try:
         await mcp_commands.submit_command("get_canvas", {}, "p", timeout=0.05)
     except ValueError as e:
-        assert "must stay open" in str(e)
+        assert "may still complete" in str(e)
     else:
         raise AssertionError("expected a timeout")
 

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
+import { saveSettings, settingsAtom } from '../bot'
 import { lang, setLang, t, type Lang } from '../i18n'
 import { pushEnabled, setPush } from '../notices'
 import { saveTheme, setTheme, themeAtom, THEMES } from '../theme'
@@ -11,6 +12,7 @@ import { shortcutsAtom } from './Shortcuts'
 
 const LANGS: [Lang, string][] = [['zh', t('settings.langZh')], ['en', t('settings.langEn')]]
 const SIDES: ['left' | 'right', string][] = [['left', t('settings.chatLeft')], ['right', t('settings.chatRight')]]
+const BACKENDS: [string, string][] = [['local', t('settings.backendLocal')], ['cloud', t('settings.backendCloud')]]
 
 function Choice({ label, on, onPick }: { label: string; on: boolean; onPick: () => void }) {
   return (
@@ -25,6 +27,7 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
   const [push, setPushOn] = useState(pushEnabled)
   const theme = useValue(themeAtom)
   const dock = useValue(dockAtom)
+  const backend = String(useValue(settingsAtom)['generation-backend'] ?? 'local')
   return (
     <Popover open={open} onOpenChange={setOpen} side={editor ? 'bottom' : 'top'} align={editor ? 'end' : 'start'} trigger={trigger}>
       <div className="ca-menu ca-settings">
@@ -33,6 +36,9 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
         <div className="ca-menu__sep" />
         <div className="ca-gen__label">{t('projectHeader.theme')}</div>
         {THEMES.map(([value, label]) => <Choice key={value} label={label} on={theme === value} onPick={() => (editor ? setTheme(editor, value) : saveTheme(value))} />)}
+        <div className="ca-menu__sep" />
+        <div className="ca-gen__label">{t('settings.backend')}</div>
+        {BACKENDS.map(([value, label]) => <Choice key={value} label={label} on={backend === value} onPick={() => void saveSettings({ 'generation-backend': value })} />)}
         {editor && (
           <>
             <div className="ca-menu__sep" />

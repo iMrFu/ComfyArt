@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import parse_qs, urlparse
 
 import folder_paths
 from aiohttp import web
@@ -16,20 +17,24 @@ def request_user(request: web.Request) -> str:
     try:
         return PromptServer.instance.user_manager.get_request_user_id(request)
     except KeyError as e:
-        raise web.HTTPForbidden(text=str(e))
+        raise web.HTTPForbidden(text=json.dumps({"error": str(e)}), content_type="application/json")
 
 
 def error(message: str, status: int) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
 
+def bad_request(message: str) -> web.HTTPBadRequest:
+    return web.HTTPBadRequest(text=json.dumps({"error": message}), content_type="application/json")
+
+
 async def json_body(request: web.Request) -> dict:
     try:
         body = await request.json()
     except ValueError:
-        raise web.HTTPBadRequest(text=json.dumps({"error": "invalid JSON body"}), content_type="application/json")
+        raise bad_request("invalid JSON body")
     if not isinstance(body, dict):
-        raise web.HTTPBadRequest(text=json.dumps({"error": "body must be an object"}), content_type="application/json")
+        raise bad_request("body must be an object")
     return body
 
 
@@ -47,3 +52,17 @@ def write_json(path: str, data) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     os.replace(tmp, path)
+
+
+def view_path(url: str) -> str:
+    query = parse_qs(urlparse(url).query)
+    name = (query.get("filename") or [""])[0]
+    subfolder = (query.get("subfolder") or [""])[0]
+    root = folder_paths.get_directory_by_type((query.get("type") or ["output"])[0])
+    if not name or root is None:
+        raise ValueError(f"not a ComfyUI file URL: {url}")
+    root = os.path.abspath(root)
+    path = os.path.abspath(os.path.join(root, subfolder, name))
+    if os.path.commonpath([root, path]) != root or not os.path.isfile(path):
+        raise ValueError(f"file not found: {url}")
+    return path

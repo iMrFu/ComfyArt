@@ -3,7 +3,8 @@ import { useValue, type Editor } from 'tldraw'
 
 import { libraryAtom } from '../library'
 import { confirmDelete } from '../home/confirmDelete'
-import { newProjectId, openProject, openView, UNTITLED } from '../projects'
+import { saveNow, saveStateAtom } from '../autosave'
+import { duplicateProject, newProject, openProject, openView, UNTITLED } from '../projects'
 import { importFiles } from './DropHandlers'
 import { historyAtom } from './HistoryDialog'
 import { Icons } from './icons'
@@ -46,7 +47,8 @@ export function ProjectHeader({ editor, projectId, children }: { editor: Editor;
         <div className="ca-menu ca-head__list">
           <Item close={close} icon={Icons.home} label={t('home.home')} run={() => openView('home')} />
           <Item close={close} icon={Icons.folder} label={t('home.projectLibrary')} run={() => openView('projects')} />
-          <Item close={close} icon={Icons.plus} label={t('projectHeader.newProject')} run={() => openProject(newProjectId())} />
+          <Item close={close} icon={Icons.plus} label={t('projectHeader.newProject')} run={() => newProject()} />
+          <Item close={close} icon={Icons.page} label={t('projectHeader.duplicateProject')} run={() => void saveNow().then(() => duplicateProject(projectId)).then(openProject)} />
           <Item close={close} icon={Icons.trash} label={t('home.deleteCurrentProject')} danger run={() => confirmDelete([projectId], () => openView('projects'))} />
           <div className="ca-menu__sep" />
           <Item close={close} icon={Icons.restore} label={t('historyDialog.canvasHistory')} run={() => historyAtom.set(true)} />
@@ -85,7 +87,14 @@ export function ProjectHeader({ editor, projectId, children }: { editor: Editor;
           if (isEnter(e)) e.currentTarget.blur()
         }}
       />
+      <SaveStatus />
       {children}
     </div>
   )
+}
+
+function SaveStatus() {
+  const { state, error, time } = useValue(saveStateAtom)
+  if (state === 'error') return <button type="button" className="ca-save" data-state={state} title={error} onClick={() => void saveNow()}>{t('projectHeader.saveFailed')}</button>
+  return <span className="ca-save" data-state={state} title={time ? t('projectHeader.savedAt', new Date(time).toLocaleTimeString()) : undefined}>{state === 'saved' ? t('projectHeader.saved') : t('projectHeader.saving')}</span>
 }

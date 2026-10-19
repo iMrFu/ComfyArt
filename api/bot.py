@@ -118,14 +118,17 @@ async def bot_update_chat(request: web.Request) -> web.Response:
 async def bot_delete_chat(request: web.Request) -> web.Response:
     if not bot_enabled():
         return bot_disabled()
-    chat = _owned_chat(request)
+    await remove_chat(_owned_chat(request))
+    return web.json_response({"ok": True})
+
+
+async def remove_chat(chat: dict) -> None:
     QUEUED.pop(chat["id"], None)
     state = ACTIVE_TURNS.get(chat["id"])
     if state is not None:
         await get_provider(chat["provider"]).stop(state.handle)
     chat_store.delete_chat(chat["id"])
     broadcast("chat_deleted", {"chat_id": chat["id"]})
-    return web.json_response({"ok": True})
 
 
 @routes.post("/comfyart/bot/chats/{cid}/send")
@@ -138,28 +141,32 @@ async def bot_send(request: web.Request) -> web.Response:
     try:
         refs = send_core.parse_refs(body.get("refs"))
         kits = send_core.parse_kits(body.get("kits"))
+        docs = send_core.parse_docs(body.get("docs"))
     except ValueError as e:
         return error(str(e), 400)
-    if not text and not refs:
-        return error("text or refs required", 400)
+    if not text and not refs and not docs:
+        return error("text, refs or docs required", 400)
     provider = get_provider(chat["provider"])
     if provider is None:
         return error(f"unknown provider {chat['provider']!r}", 400)
-    if (refs or any(k["images"] for k in kits)) and not provider.capabilities().attachments:
+    can_see = provider.capabilities().attachments
+    if (send_core.visual_refs(refs) or any(k["images"] for k in kits)) and not can_see:
         return error(f"{provider.label} cannot take images; pick another agent or remove the references", 400)
     skill_name = str(body.get("skill") or "").strip()
     try:
-        attachments, lines = await send_core.prepare_attachments(refs, kits)
+        attachments, lines = await send_core.prepare_attachments(refs, kits, docs, page_images=can_see)
     except ValueError as e:
         return error(str(e), 400)
     display_blocks = [{"type": r["kind"], "url": r["src"], "shape": r["id"]} for r in refs]
+    display_blocks += [{"type": "file", "url": d["src"], "name": d["name"]} for d in docs]
     display_blocks += [{"type": "kit", "name": k["name"]} for k in kits]
     if skill_name:
         display_blocks.append({"type": "skill", "name": skill_name})
     if text:
         display_blocks.append({"type": "text", "text": text})
+    context = str(body.get("context") or "").strip()
     provider_text = send_core.compose_provider_text(
-        text, skill_name=skill_name, memory=str(body.get("memory") or ""), lines=lines)
+        text, skill_name=skill_name, memory=str(body.get("memory") or ""), lines=[*lines, *([context] if context else [])])
     user_msg, assistant_msg = send_core.queue_or_begin(
         chat, text=text, provider_text=provider_text,
         attachments=attachments, display_blocks=display_blocks)

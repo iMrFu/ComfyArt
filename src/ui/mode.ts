@@ -9,7 +9,6 @@ export const modeAtom = atom<Mode | null>('mode', null)
 export const strokesAtom = atom<Stroke[]>('strokes', [])
 export const brushAtom = atom('brush', 40)
 export const padsAtom = atom<Pads>('pads', { l: 0, t: 0, r: 0, b: 0 })
-export const MAX_REGIONS = 6
 export const boxesAtom = atom<[number, number, number, number][]>('split boxes', [])
 
 export function enterMode(mode: Mode) {

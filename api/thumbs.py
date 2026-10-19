@@ -6,8 +6,8 @@ import uuid
 from aiohttp import web
 from PIL import Image, ImageOps
 
-from ._common import app_path, routes
-from .bot_media import VIDEO_EXT, video_frame, view_path
+from ._common import app_path, routes, view_path
+from .bot_media import VIDEO_EXT, video_frames
 
 SIZES = (256, 512, 1024)
 SKIP_FACTOR = 1.25
@@ -29,7 +29,7 @@ def thumb_for(url: str, max_edge: int) -> str:
     dest = app_path("thumbs", f"{key}.webp")
     if os.path.isfile(dest):
         return dest
-    with (video_frame(src) if video else Image.open(src)) as im:
+    with (video_frames(src, 1)[0][0][1] if video else Image.open(src)) as im:
         if not video and not getattr(im, "is_animated", False) and max(im.size) <= size * SKIP_FACTOR:
             return src
         im = ImageOps.exif_transpose(im)

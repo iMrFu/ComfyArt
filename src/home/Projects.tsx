@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { thumbUrl } from '../comfy'
 import { lang, t } from '../i18n'
-import { fillCovers, listProjects, newProjectId, openProject, renameProject, UNTITLED, type ProjectEntry } from '../projects'
+import { duplicateProject, fillCovers, listProjects, newProject, openProject, renameProject, setPinned, UNTITLED, type ProjectEntry } from '../projects'
 import { Icons } from '../ui/icons'
 import { isEnter } from '../ui/keys'
 import { Popover } from '../ui/Popover'
@@ -33,6 +33,7 @@ export function ProjectCard({ entry, onChanged, selecting, selected, onToggle }:
       <button type="button" className="ca-pcard__cover" data-count={covers.length} aria-label={entry.name || UNTITLED} onClick={() => (selecting ? onToggle?.() : openProject(entry.id))}>
         {covers.map((src) => <img key={src} src={thumbUrl(src, 512)} alt="" loading="lazy" />)}
         {selecting && <span className="ca-pcard__check">{selected && Icons.check}</span>}
+        {entry.pinned && !selecting && <span className="ca-pcard__pin ca-icon" title={t('home.pinned')}>{Icons.pin}</span>}
       </button>
       <div className="ca-pcard__row">
         {renaming
@@ -41,7 +42,9 @@ export function ProjectCard({ entry, onChanged, selecting, selected, onToggle }:
         {!selecting && !renaming && (
           <Popover open={menu} onOpenChange={setMenu} align="end" trigger={({ open, toggle }) => <button type="button" className="ca-pcard__more" data-open={open || undefined} title={t('home.more')} onClick={toggle}><span className="ca-icon">{Icons.more}</span></button>}>
             <div className="ca-menu ca-pcard__menu">
+              <button type="button" className="ca-menu__item" onClick={() => { setMenu(false); void setPinned(entry.id, !entry.pinned).then(onChanged) }}>{entry.pinned ? t('home.unpin') : t('home.pin')}</button>
               <button type="button" className="ca-menu__item" onClick={() => { setMenu(false); setRenaming(true) }}>{t('home.rename')}</button>
+              <button type="button" className="ca-menu__item" onClick={() => { setMenu(false); void duplicateProject(entry.id).then(onChanged) }}>{t('common.duplicate')}</button>
               <button type="button" className="ca-menu__item ca-menu__item--danger" onClick={() => { setMenu(false); confirmDelete([entry.id], onChanged) }}>{t('common.delete')}</button>
             </div>
           </Popover>
@@ -72,7 +75,7 @@ export function Projects() {
       <div className="ca-projects__grid">
         {!selecting && (
           <div className="ca-pcard">
-            <button type="button" className="ca-pcard__cover ca-pcard__new" onClick={() => openProject(newProjectId())}><span className="ca-icon">{Icons.plus}</span></button>
+            <button type="button" className="ca-pcard__cover ca-pcard__new" onClick={() => newProject()}><span className="ca-icon">{Icons.plus}</span></button>
             <div className="ca-pcard__row"><span className="ca-pcard__name">{t('projectHeader.newProject')}</span></div>
           </div>
         )}

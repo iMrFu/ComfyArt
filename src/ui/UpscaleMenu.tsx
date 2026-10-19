@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Editor, TLImageShape } from 'tldraw'
 
 import * as actions from '../actions'
+import { Chips } from './Chips'
 import { t } from '../i18n'
 
 const STYLES: [string, string][] = [
@@ -32,9 +33,7 @@ export function UpscaleMenu({ editor, shape, w, h, onDone, onError }: { editor: 
       </div>
       {detail && (
         <>
-          <div className="ca-panel__chips">
-            {STYLES.map(([label, value]) => <button key={label} type="button" className="ca-panel__chip" data-on={style === value || undefined} onClick={() => setStyle(value)}>{label}</button>)}
-          </div>
+          <Chips value={style} options={STYLES.map(([label, value]) => [value, label] as const)} onPick={setStyle} />
           <label className="ca-panel__row"><span>{t('upscaleMenu.detailStrength')}</span><input type="range" min={10} max={70} value={strength} onChange={(e) => setStrength(Number(e.target.value))} /><span className="ca-panel__val">{strength}</span></label>
         </>
       )}

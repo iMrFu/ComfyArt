@@ -7,9 +7,11 @@ import { libraryAtom } from '../library'
 import { ask, parseJson } from '../llm'
 import { correct, forget, MEMORY_CATEGORIES, memoryAtom, memoryLogAtom, remember, toInputs, type MemoryInput } from '../memory'
 import { isPdf, uploadPdf } from '../pdf'
+import { AbilitiesPanel } from './AbilitiesPanel'
 import { Icons } from './icons'
 import { t } from '../i18n'
 import { isEnter } from './keys'
+import { Modal } from './Modal'
 
 export const memoryOpenAtom = atom('memory open', false)
 
@@ -98,67 +100,64 @@ export function MemoryDialog({ onError }: { onError: (msg: string) => void }) {
     if (!found.length) throw new Error(t('memoryDialog.couldntExtractAnyLong'))
     await remember(found, t('memoryDialog.import'))
   }
-  const shown = tab === 'log' ? [] : memory.filter((m) => (m.category ?? 'about') === tab)
+  const categoryTab = tab !== 'log' && tab !== 'abilities'
+  const shown = categoryTab ? memory.filter((m) => (m.category ?? 'about') === tab) : []
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename ca-memory">
-        <div className="ca-side__head">
-          <span>{onboarding ? t('memoryDialog.tellTheAgentAboutYourself') : t('common.memory')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
-        </div>
-        {onboarding ? (
-          <Onboarding onDone={(items) => { setOnboarding(false); if (items?.length) void remember(items, t('memoryDialog.qa')).catch(fail) }} />
-        ) : (
-          <div className="ca-rename__body">
-            <div className="ca-chat__hint">{t('memoryDialog.theAgentFollowsTheseMemories')}</div>
-            <div className="ca-style__row">
-              <button type="button" className="ca-lib__new" onClick={() => setOnboarding(true)}><span className="ca-icon">{Icons.agent}</span>{t('memoryDialog.tellMeAboutYourself')}</button>
-              <button type="button" className="ca-lib__new" disabled={!!busy} onClick={() => file.current?.click()}><span className="ca-icon">{Icons.upload}</span>{busy || t('memoryDialog.importFromFile')}</button>
-              <input ref={file} type="file" multiple hidden accept="image/*,.pdf,.txt,.md,.json,.csv" onChange={(e) => { const list = e.target.files; void importFiles(list).catch(fail).finally(() => setBusy('')); e.target.value = '' }} />
-            </div>
-            <div className="ca-panel__chips">
-              {MEMORY_CATEGORIES.map(([id, label]) => (
-                <button key={id} type="button" className="ca-panel__chip" data-on={tab === id || undefined} onClick={() => setTab(id)}>
-                  {label} {memory.filter((m) => (m.category ?? 'about') === id).length || ''}
-                </button>
-              ))}
-              <button type="button" className="ca-panel__chip" data-on={tab === 'log' || undefined} onClick={() => setTab('log')}>{t('memoryDialog.evolutionLog')}</button>
-            </div>
-            {tab === 'log' && (log.length === 0
-              ? <div className="ca-side__empty">{t('memoryDialog.noEvolutionLogYet')}</div>
-              : log.slice(0, 200).map((l, i) => (
-                <div key={i} className="ca-memory__row ca-memory__log">
-                  <span className="ca-model__tag">{LOG_LABELS[l.action]}</span>
-                  <span className="ca-menu__grow">{l.text}</span>
-                  <span className="ca-chat__hint">{l.source} · {new Date(l.time).toLocaleString()}</span>
-                </div>
-              )))}
-            {tab !== 'log' && shown.length === 0 && <div className="ca-side__empty">{t('memoryDialog.noMemoriesYet')}</div>}
-            {shown.map((m) => (
-              <div key={m.id} className="ca-memory__row">
-                {editing === m.id ? (
-                  <input
-                    autoFocus
-                    className="ca-panel__input"
-                    defaultValue={m.text}
-                    onBlur={(e) => { setEditing(null); const v = e.target.value.trim(); if (v && v !== m.text) void correct([{ old: m.text, new: v }], t('frameToolbar.manual')).catch(fail) }}
-                    onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) e.currentTarget.blur() }}
-                  />
-                ) : (
-                  <span className="ca-menu__grow" onDoubleClick={() => setEditing(m.id)}>{m.text}</span>
-                )}
-                <button type="button" className="ca-history__del" title={t('memoryDialog.correctMemory')} onClick={() => setEditing(m.id)}>{Icons.textTool}</button>
-                <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => void forget([m.text], t('frameToolbar.manual')).catch(fail)}>{Icons.trash}</button>
-              </div>
-            ))}
-            {tab !== 'log' && <div className="ca-style__row">
-              <input className="ca-panel__input" value={text} placeholder={t('memoryDialog.add', MEMORY_CATEGORIES.find(([id]) => id === tab)![1])} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) add() }} />
-              <button type="button" className="ca-panel__primary ca-memory__add" disabled={!text.trim()} onClick={add}>{t('common.add')}</button>
-            </div>}
+    <Modal title={onboarding ? t('memoryDialog.tellTheAgentAboutYourself') : t('common.memory')} className="ca-rename ca-memory" onClose={close}>
+      {onboarding ? (
+        <Onboarding onDone={(items) => { setOnboarding(false); if (items?.length) void remember(items, t('memoryDialog.qa')).catch(fail) }} />
+      ) : (
+        <div className="ca-rename__body">
+          <div className="ca-chat__hint">{t('memoryDialog.theAgentFollowsTheseMemories')}</div>
+          <div className="ca-style__row">
+            <button type="button" className="ca-lib__new" onClick={() => setOnboarding(true)}><span className="ca-icon">{Icons.agent}</span>{t('memoryDialog.tellMeAboutYourself')}</button>
+            <button type="button" className="ca-lib__new" disabled={!!busy} onClick={() => file.current?.click()}><span className="ca-icon">{Icons.upload}</span>{busy || t('memoryDialog.importFromFile')}</button>
+            <input ref={file} type="file" multiple hidden accept="image/*,.pdf,.txt,.md,.json,.csv" onChange={(e) => { const list = e.target.files; void importFiles(list).catch(fail).finally(() => setBusy('')); e.target.value = '' }} />
           </div>
-        )}
-      </div>
-    </div>
+          <div className="ca-panel__chips">
+            {MEMORY_CATEGORIES.map(([id, label]) => (
+              <button key={id} type="button" className="ca-panel__chip" data-on={tab === id || undefined} onClick={() => setTab(id)}>
+                {label} {memory.filter((m) => (m.category ?? 'about') === id).length || ''}
+              </button>
+            ))}
+            <button type="button" className="ca-panel__chip" data-on={tab === 'log' || undefined} onClick={() => setTab('log')}>{t('memoryDialog.evolutionLog')}</button>
+            <button type="button" className="ca-panel__chip" data-on={tab === 'abilities' || undefined} onClick={() => setTab('abilities')}>{t('abilities.title')}</button>
+          </div>
+          {tab === 'abilities' && <AbilitiesPanel onError={onError} />}
+          {tab === 'log' && (log.length === 0
+            ? <div className="ca-side__empty">{t('memoryDialog.noEvolutionLogYet')}</div>
+            : log.slice(0, 200).map((l, i) => (
+              <div key={i} className="ca-memory__row ca-memory__log">
+                <span className="ca-model__tag">{LOG_LABELS[l.action]}</span>
+                <span className="ca-menu__grow">{l.text}</span>
+                <span className="ca-chat__hint">{l.source} · {new Date(l.time).toLocaleString()}</span>
+              </div>
+            )))}
+          {categoryTab && shown.length === 0 && <div className="ca-side__empty">{t('memoryDialog.noMemoriesYet')}</div>}
+          {shown.map((m) => (
+            <div key={m.id} className="ca-memory__row">
+              {editing === m.id ? (
+                <input
+                  autoFocus
+                  className="ca-panel__input"
+                  defaultValue={m.text}
+                  onBlur={(e) => { setEditing(null); const v = e.target.value.trim(); if (v && v !== m.text) void correct([{ old: m.text, new: v }], t('frameToolbar.manual')).catch(fail) }}
+                  onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) e.currentTarget.blur() }}
+                />
+              ) : (
+                <span className="ca-menu__grow" onDoubleClick={() => setEditing(m.id)}>{m.text}</span>
+              )}
+              <button type="button" className="ca-history__del" title={t('memoryDialog.correctMemory')} onClick={() => setEditing(m.id)}>{Icons.textTool}</button>
+              <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => void forget([m.text], t('frameToolbar.manual')).catch(fail)}>{Icons.trash}</button>
+            </div>
+          ))}
+          {categoryTab && <div className="ca-style__row">
+            <input className="ca-panel__input" value={text} placeholder={t('memoryDialog.add', MEMORY_CATEGORIES.find(([id]) => id === tab)![1])} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) add() }} />
+            <button type="button" className="ca-panel__primary ca-memory__add" disabled={!text.trim()} onClick={add}>{t('common.add')}</button>
+          </div>}
+        </div>
+      )}
+    </Modal>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useEditor, useValue, type TLAssetId } from 'tldraw'
 
 import { drawStrokes, type Pads } from '../actions'
-import { boxesAtom, brushAtom, MAX_REGIONS, modeAtom, padsAtom, strokesAtom } from './mode'
+import { boxesAtom, brushAtom, modeAtom, padsAtom, strokesAtom } from './mode'
 import { useSelectedImage, useSelectionRect, type ScreenRect } from './selection'
 import { t } from '../i18n'
 
@@ -113,7 +113,6 @@ function BoxLayer({ rect }: { rect: ScreenRect }) {
       style={{ left: rect.l, top: rect.t, width: w, height: h }}
       onPointerDown={(e) => {
         e.stopPropagation()
-        if (boxes.length >= MAX_REGIONS) return
         e.currentTarget.setPointerCapture(e.pointerId)
         const [x, y] = uv(e)
         setDraft([x, y, x, y])

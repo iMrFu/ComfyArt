@@ -4,18 +4,10 @@ import { atom, getSnapshot, loadSnapshot, useValue, type Editor } from 'tldraw'
 import { listVersions, loadVersion, saveVersion, type Version } from '../history'
 import { errorText } from '../jobs'
 import { confirmAtom } from './Confirm'
-import { Icons } from './icons'
-import { t } from '../i18n'
+import { Modal } from './Modal'
+import { t, timeAgo } from '../i18n'
 
 export const historyAtom = atom('canvas history', false)
-
-function ago(time: number) {
-  const m = Math.round((Date.now() - time) / 60000)
-  if (m < 1) return t('historyDialog.justNow')
-  if (m < 60) return t('historyDialog.minAgo', m)
-  if (m < 60 * 24) return t('historyDialog.hAgo', Math.round(m / 60))
-  return new Date(time).toLocaleString()
-}
 
 export function HistoryDialog({ editor, projectId, onError }: { editor: Editor; projectId: string; onError: (msg: string) => void }) {
   const open = useValue(historyAtom)
@@ -36,7 +28,7 @@ export function HistoryDialog({ editor, projectId, onError }: { editor: Editor; 
     run: async () => {
       try {
         await saveVersion(projectId, getSnapshot(editor.store), editor.getCurrentPageShapeIds().size)
-        loadSnapshot(editor.store, await loadVersion(projectId, v.file))
+        loadSnapshot(editor.store, await loadVersion(projectId, v.time))
         close()
       } catch (e) {
         onError(errorText(e))
@@ -45,23 +37,17 @@ export function HistoryDialog({ editor, projectId, onError }: { editor: Editor; 
   })
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename">
-        <div className="ca-side__head">
-          <span>{t('historyDialog.canvasHistory')}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
-        </div>
-        <div className="ca-history__list">
-          {versions?.length === 0 && <div className="ca-side__empty">{t('historyDialog.noCanvasHistoryYet')}</div>}
-          {versions?.map((v) => (
-            <div key={v.file} className="ca-history__row">
-              <span className="ca-menu__grow">{ago(v.time)}</span>
-              <span className="ca-menu__key">{t('historyDialog.elements', v.count)}</span>
-              <button type="button" className="ca-panel__secondary" onClick={() => restore(v)}>{t('historyDialog.restore')}</button>
-            </div>
-          ))}
-        </div>
+    <Modal title={t('historyDialog.canvasHistory')} onClose={close}>
+      <div className="ca-history__list">
+        {versions?.length === 0 && <div className="ca-side__empty">{t('historyDialog.noCanvasHistoryYet')}</div>}
+        {versions?.map((v) => (
+          <div key={v.time} className="ca-history__row">
+            <span className="ca-menu__grow">{timeAgo(v.time)}</span>
+            <span className="ca-menu__key">{t('historyDialog.elements', v.count)}</span>
+            <button type="button" className="ca-panel__secondary" onClick={() => restore(v)}>{t('historyDialog.restore')}</button>
+          </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   )
 }

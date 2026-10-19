@@ -2,7 +2,8 @@ import asyncio
 from typing import Optional
 
 from . import chat_store
-from .bot_media import ATTACH_MAX_COUNT, MEDIA_ERRORS, render_attachment
+from .bot_docs import DOC_ERRORS, document_line, read_document
+from .bot_media import ATTACH_MAX_COUNT, MEDIA_ERRORS, SHEET_FRAMES, render_attachment
 from .bot_turns import ACTIVE_TURNS, QUEUED, begin_turn, broadcast
 
 
@@ -24,8 +25,22 @@ def parse_refs(raw) -> list[dict]:
         if not isinstance(item, dict) or not isinstance(item.get("src"), str):
             raise ValueError(f"refs[{i}] needs src")
         refs.append({"id": str(item.get("id") or ""), "src": item["src"], "name": str(item.get("name") or ""),
-                     "kind": "video" if item.get("kind") == "video" else "image"})
+                     "kind": item.get("kind") if item.get("kind") in ("video", "audio") else "image",
+                     "transcript": str(item.get("transcript") or "")})
     return refs
+
+
+def parse_docs(raw) -> list[dict]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("docs must be an array")
+    docs = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, dict) or not isinstance(item.get("src"), str):
+            raise ValueError(f"docs[{i}] needs src")
+        docs.append({"src": item["src"], "name": str(item.get("name") or "document")})
+    return docs
 
 
 def parse_kits(raw) -> list[dict]:
@@ -42,15 +57,29 @@ def parse_kits(raw) -> list[dict]:
     return kits
 
 
-async def prepare_attachments(refs: list[dict], kits: list[dict]) -> tuple[list[dict], list[str]]:
+def visual_refs(refs: list[dict]) -> list[dict]:
+    return [r for r in refs if r["kind"] != "audio"]
+
+
+async def prepare_attachments(refs: list[dict], kits: list[dict], docs: list[dict] = (),
+                              page_images: bool = True) -> tuple[list[dict], list[str]]:
     attachments = []
-    for r in refs[:ATTACH_MAX_COUNT]:
+    for r in visual_refs(refs)[:ATTACH_MAX_COUNT]:
         try:
             attachments.append(await asyncio.to_thread(render_attachment, r["src"]))
         except MEDIA_ERRORS as e:
             raise ValueError(f"could not read {r['src']} ({e})") from e
+    doc_lines = []
+    for d in docs:
+        try:
+            text, pages, images = await asyncio.to_thread(read_document, d["src"])
+        except DOC_ERRORS as e:
+            raise ValueError(f"could not read {d['name']} ({e})") from e
+        images = images[:max(0, ATTACH_MAX_COUNT - len(attachments))] if page_images else []
+        attachments += images
+        doc_lines.append(document_line(d["name"], d["src"], text, pages, len(images)))
     skipped = []
-    for src in [src for k in kits for src in k["images"]][:ATTACH_MAX_COUNT - len(attachments)]:
+    for src in [src for k in kits for src in k["images"]][:max(0, ATTACH_MAX_COUNT - len(attachments))]:
         try:
             attachments.append(await asyncio.to_thread(render_attachment, src))
         except MEDIA_ERRORS:
@@ -59,11 +88,17 @@ async def prepare_attachments(refs: list[dict], kits: list[dict]) -> tuple[list[
     for i, r in enumerate(refs):
         label = f' "{r["name"]}"' if r["name"] else ""
         target = f"shape id {r['id']}" if r["id"] else "not on the canvas"
-        lines.append(f"[Attached {r['kind']} {i + 1}{label}: {target} — {r['src']}. Use the shape id with edit tools or as a generation ref.]")
+        if r["kind"] == "audio":
+            heard = f' Transcript: "{r["transcript"]}"' if r["transcript"] else " No speech was recognised in it."
+            lines.append(f"[Attached audio {i + 1}{label}: {target} — {r['src']}. Use the shape id as reference_audios, speech_audio or a voice reference.{heard}]")
+            continue
+        frames = f" Its picture shows {SHEET_FRAMES} frames across the video; call view_video for more." if r["kind"] == "video" else ""
+        lines.append(f"[Attached {r['kind']} {i + 1}{label}: {target} — {r['src']}. Use the shape id with edit tools or as a generation ref.{frames}]")
+    lines += doc_lines
     for k in kits:
         lines.append(f"[Referenced asset: {k['description'] or k['name']}. Its {len(k['images'])} image(s) are attached after the canvas images; pass their URLs as refs to follow them.]"
                      + "".join(f"\n  - {src}" for src in k["images"]))
-    if len(refs) + sum(len(k["images"]) for k in kits) > ATTACH_MAX_COUNT:
+    if len(visual_refs(refs)) + sum(len(k["images"]) for k in kits) > ATTACH_MAX_COUNT:
         lines.append(f"[Only the first {ATTACH_MAX_COUNT} images are attached; look at the rest with view_canvas.]")
     if skipped:
         lines.append(f"[These asset images could not be attached: {', '.join(skipped)}]")

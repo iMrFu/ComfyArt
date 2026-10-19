@@ -7,12 +7,13 @@ import { confirmAtom } from './Confirm'
 import { Icons } from './icons'
 import { t } from '../i18n'
 import { uuid } from '../id'
+import { Modal } from './Modal'
 
 export const skillsOpenAtom = atom('skills open', false)
 
 type View = { kind: 'list' } | { kind: 'edit'; skill: Skill } | { kind: 'history'; skill: Skill; versions: SkillVersion[] | null }
 
-function SkillForm({ initial, onDone }: { initial: Skill; onDone: (s: Skill | null) => void }) {
+export function SkillForm({ initial, onDone }: { initial: Skill; onDone: (s: Skill | null) => void }) {
   const [draft, setDraft] = useState(initial)
   const [open, setOpen] = useState<string | null>(null)
   const file = useRef<HTMLInputElement>(null)
@@ -88,61 +89,55 @@ export function SkillsDialog({ onError }: { onError: (msg: string) => void }) {
   const act = (fn: () => Promise<unknown>) => void fn().then(refresh).catch((e) => onError(errorText(e)))
 
   return (
-    <div className="ca-modal" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close() }}>
-      <div className="ca-modal__card ca-rename ca-memory ca-skills-dialog">
-        <div className="ca-side__head">
-          <span>{view.kind === 'list' ? t('skillsDialog.mySkills') : view.kind === 'edit' ? t('skillsDialog.editSkill') : t('skillsDialog.versionHistoryOf', view.skill.name)}</span>
-          <button type="button" className="ca-panel__icon" title={t('common.close')} onClick={close}>{Icons.close}</button>
-        </div>
-        {view.kind === 'edit' && (
-          <SkillForm
-            initial={view.skill}
-            onDone={(s) => {
-              setView({ kind: 'list' })
-              if (s) act(() => saveSkill(s))
-            }}
-          />
-        )}
-        {view.kind === 'history' && (
-          <div className="ca-rename__body">
-            {!view.versions && <div className="ca-side__empty">{t('skillsDialog.loading')}</div>}
-            {view.versions?.length === 0 && <div className="ca-side__empty">{t('skillsDialog.noVersionsYetVersionsAre')}</div>}
-            {view.versions?.map((v) => (
-              <div key={v.time} className="ca-memory__row">
-                <span className="ca-menu__grow" title={v.skill.instructions}>
-                  {new Date(v.time).toLocaleString()} · {v.skill.name} · {t('skillsDialog.versionFiles', Object.keys(v.skill.files ?? {}).length)}
-                </span>
-                <button type="button" className="ca-panel__chip" onClick={() => { setView({ kind: 'list' }); act(() => saveSkill({ ...v.skill, id: view.skill.id })) }}>{t('skillsDialog.rollBack')}</button>
-              </div>
-            ))}
-            <div className="ca-panel__foot"><button type="button" className="ca-panel__secondary" onClick={() => setView({ kind: 'list' })}>{t('skillsDialog.back')}</button></div>
-          </div>
-        )}
-        {view.kind === 'list' && (
-          <div className="ca-rename__body">
-            <div className="ca-chat__hint">{t('skillsDialog.eachSkillIsAFolder')}</div>
-            <div className="ca-style__row">
-              <button type="button" className="ca-lib__new" onClick={() => setView({ kind: 'edit', skill: { id: uuid().slice(0, 8), name: '', instructions: '', files: {}, custom: true } })}>
-                <span className="ca-icon">{Icons.plus}</span>{t('skillsDialog.newSkill')}
-              </button>
-              <button type="button" className="ca-lib__new" onClick={() => folder.current?.click()}><span className="ca-icon">{Icons.upload}</span>{t('skillsDialog.importFolder')}</button>
-              <input ref={folder} type="file" multiple hidden onChange={(e) => { const list = e.target.files; if (list) act(async () => { const { skipped } = await importFolder(list); setNote(skipped.length ? t('skillsDialog.importedSkipped', skipped.join(t('common.listSep'))) : t('skillsDialog.imported')) }); e.target.value = '' }} />
+    <Modal title={view.kind === 'list' ? t('skillsDialog.mySkills') : view.kind === 'edit' ? t('skillsDialog.editSkill') : t('skillsDialog.versionHistoryOf', view.skill.name)} className="ca-rename ca-memory ca-skills-dialog" onClose={close}>
+      {view.kind === 'edit' && (
+        <SkillForm
+          initial={view.skill}
+          onDone={(s) => {
+            setView({ kind: 'list' })
+            if (s) act(() => saveSkill(s))
+          }}
+        />
+      )}
+      {view.kind === 'history' && (
+        <div className="ca-rename__body">
+          {!view.versions && <div className="ca-side__empty">{t('skillsDialog.loading')}</div>}
+          {view.versions?.length === 0 && <div className="ca-side__empty">{t('skillsDialog.noVersionsYetVersionsAre')}</div>}
+          {view.versions?.map((v) => (
+            <div key={v.time} className="ca-memory__row">
+              <span className="ca-menu__grow" title={v.skill.instructions}>
+                {new Date(v.time).toLocaleString()} · {v.skill.name} · {t('skillsDialog.versionFiles', Object.keys(v.skill.files ?? {}).length)}
+              </span>
+              <button type="button" className="ca-panel__chip" onClick={() => { setView({ kind: 'list' }); act(() => saveSkill({ ...v.skill, id: view.skill.id })) }}>{t('skillsDialog.rollBack')}</button>
             </div>
-            {note && <div className="ca-chat__hint">{note}</div>}
-            {skills.length === 0 && <div className="ca-side__empty">{t('skillsDialog.noPersonalSkillsYet')}</div>}
-            {skills.map((s) => (
-              <div key={s.id} className="ca-memory__row">
-                <span className="ca-icon">{Icons.skill}</span>
-                <span className="ca-menu__grow" title={s.instructions}>{s.name}{Object.keys(s.files ?? {}).length + Object.keys(s.images ?? {}).length > 0 && <span className="ca-menu__key"> · {t('skillsDialog.filesImages', Object.keys(s.files ?? {}).length, Object.keys(s.images ?? {}).length)}</span>}</span>
-                <button type="button" className="ca-history__del" title={t('skillsDialog.use')} onClick={() => { skillAtom.set(s); close() }}>{Icons.comment}</button>
-                <button type="button" className="ca-history__del" title={t('common.edit')} onClick={() => setView({ kind: 'edit', skill: s })}>{Icons.textTool}</button>
-                <button type="button" className="ca-history__del" title={t('skillsDialog.versionHistory')} onClick={() => setView({ kind: 'history', skill: s, versions: null })}>{Icons.undo}</button>
-                <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => confirmAtom.set({ title: t('skillsDialog.deleteSkill', s.name), desc: t('skillsDialog.theSkillFolderAndAll'), ok: t('common.delete'), run: () => act(() => deleteSkill(s.id)) })}>{Icons.trash}</button>
-              </div>
-            ))}
+          ))}
+          <div className="ca-panel__foot"><button type="button" className="ca-panel__secondary" onClick={() => setView({ kind: 'list' })}>{t('skillsDialog.back')}</button></div>
+        </div>
+      )}
+      {view.kind === 'list' && (
+        <div className="ca-rename__body">
+          <div className="ca-chat__hint">{t('skillsDialog.eachSkillIsAFolder')}</div>
+          <div className="ca-style__row">
+            <button type="button" className="ca-lib__new" onClick={() => setView({ kind: 'edit', skill: { id: uuid().slice(0, 8), name: '', instructions: '', files: {}, custom: true } })}>
+              <span className="ca-icon">{Icons.plus}</span>{t('skillsDialog.newSkill')}
+            </button>
+            <button type="button" className="ca-lib__new" onClick={() => folder.current?.click()}><span className="ca-icon">{Icons.upload}</span>{t('skillsDialog.importFolder')}</button>
+            <input ref={folder} type="file" multiple hidden onChange={(e) => { const list = e.target.files; if (list) act(async () => { const { skipped } = await importFolder(list); setNote(skipped.length ? t('skillsDialog.importedSkipped', skipped.join(t('common.listSep'))) : t('skillsDialog.imported')) }); e.target.value = '' }} />
           </div>
-        )}
-      </div>
-    </div>
+          {note && <div className="ca-chat__hint">{note}</div>}
+          {skills.length === 0 && <div className="ca-side__empty">{t('skillsDialog.noPersonalSkillsYet')}</div>}
+          {skills.map((s) => (
+            <div key={s.id} className="ca-memory__row">
+              <span className="ca-icon">{Icons.skill}</span>
+              <span className="ca-menu__grow" title={s.learned ? t('proactive.learnedFrom', s.learned.length, s.learned.join(' / ')) : s.instructions}>{s.name}{s.learned && <span className="ca-model__tag">{t('skillsDialog.learned')}</span>}{Object.keys(s.files ?? {}).length + Object.keys(s.images ?? {}).length > 0 && <span className="ca-menu__key"> · {t('skillsDialog.filesImages', Object.keys(s.files ?? {}).length, Object.keys(s.images ?? {}).length)}</span>}</span>
+              <button type="button" className="ca-history__del" title={t('skillsDialog.use')} onClick={() => { skillAtom.set(s); close() }}>{Icons.comment}</button>
+              <button type="button" className="ca-history__del" title={t('common.edit')} onClick={() => setView({ kind: 'edit', skill: s })}>{Icons.textTool}</button>
+              <button type="button" className="ca-history__del" title={t('skillsDialog.versionHistory')} onClick={() => setView({ kind: 'history', skill: s, versions: null })}>{Icons.undo}</button>
+              <button type="button" className="ca-history__del" title={t('common.delete')} onClick={() => confirmAtom.set({ danger: true, title: t('skillsDialog.deleteSkill', s.name), desc: t('skillsDialog.theSkillFolderAndAll'), ok: t('common.delete'), run: () => act(() => deleteSkill(s.id)) })}>{Icons.trash}</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   )
 }

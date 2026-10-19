@@ -1,11 +1,14 @@
 import { zipSync } from 'fflate'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { useActions, useEditor, type Box, type Editor, type JsonObject, type TLFrameShape, type TLShape, type TLShapeId } from 'tldraw'
+import { useActions, useEditor, useValue, type Box, type Editor, type JsonObject, type TLFrameShape, type TLShape, type TLShapeId } from 'tldraw'
 
+import { openChat } from '../bot'
+import { refLinkedOf, setRefLinked } from '../chatFrame'
 import { isBoard, renderBoard } from '../compose'
+import { chatViewAtom } from './AgentPanel'
 import { ComposePanel } from './ComposePanel'
 import { createGenerator } from '../generate'
-import { mediaAsset } from '../jobs'
+import { errorText, mediaAsset } from '../jobs'
 import { download } from '../psd'
 import { artboardStyle, type ArtboardStyle } from '../shapes/ArtboardShape'
 import type { GeneratorShape } from '../shapes/GeneratorShape'
@@ -169,6 +172,7 @@ export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
   const bar = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [presets, setPresets] = useState(false)
+  const linked = useValue('ref linked', () => refLinkedOf(editor), [editor])
   useLayoutEffect(() => {
     if (bar.current && bar.current.offsetWidth !== width) setWidth(bar.current.offsetWidth)
   })
@@ -198,6 +202,16 @@ export function FrameToolbar({ onError }: { onError: (msg: string) => void }) {
 
   return (
     <div ref={bar} className="ca-bar ca-toolbar" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
+      {typeof frame.meta.chatId === 'string' && (
+        <button type="button" className="ca-bar__btn" title={t('chatFrame.locateChatTip')} onClick={() => { chatViewAtom.set('open'); openChat(frame.meta.chatId as string).catch((e) => onError(errorText(e))) }}>
+          <span className="ca-icon">{Icons.agent}</span><span>{t('chatFrame.locateChat')}</span>
+        </button>
+      )}
+      {frame.meta.refFrame === true && (
+        <button type="button" className="ca-bar__btn" data-on={linked || undefined} title={linked ? t('chatFrame.linkedTip') : t('chatFrame.linkTip')} onClick={() => setRefLinked(editor, !linked)}>
+          <span className="ca-icon">{Icons.agent}</span><span>{linked ? t('chatFrame.linked') : t('chatFrame.link')}</span>
+        </button>
+      )}
       <input className="ca-frame__name" value={frame.props.name} placeholder={t('common.artboard')} onChange={(e) => editor.updateShape<TLFrameShape>({ id: frame.id, type: 'frame', props: { name: e.target.value } })} onKeyDown={(e) => e.stopPropagation()} />
       <label className="ca-num"><span>W</span><input type="number" value={Math.round(frame.props.w)} disabled={sizingOf(frame, 'w') === 'hug'} onChange={(e) => size('w', Number(e.target.value))} onKeyDown={(e) => e.stopPropagation()} /></label>
       {sizing('w')}

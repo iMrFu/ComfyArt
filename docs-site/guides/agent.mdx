@@ -18,9 +18,15 @@ The mode switch under the chat box picks what a message does:
 - **Agent**: the agent plans and works on the canvas with tools. Needs an agent to be enabled (below).
 - **Image** and **Video**: send the prompt straight to a generator, no agent involved. These work out of the box.
 
-An empty chat offers three quick starts: **Upload a reference**, **Start from a skill** and **Use a brand kit**. Select images or videos on the canvas, drag them in, or paste them to attach them as references. Type `/` to pick a skill and `@` to reference brand kits, characters, products or canvas items. Comments can be sent to the chat too, together with the area you marked.
+An empty chat offers three quick starts: **Upload a reference**, **Start from a skill** and **Use a brand kit**. Select images, videos or audio on the canvas, drag them in, or paste them to attach them as references. Type `/` to pick a skill and `@` to reference brand kits, characters, products or canvas items. Comments can be sent to the chat too, together with the area you marked.
 
-While it works, the Agent can post a plan as a checklist and ticks items off. Its tool calls fold into one line ("Ran 17 steps") that you can expand to see each step and how long it took.
+**Upload file** (the + menu), drag and drop, and paste accept:
+
+- **Images and videos**: placed on the canvas and attached. A video is shown to the agent as four frames spread across it; the agent can call `view_video` to look at more frames or one stretch closely.
+- **Audio**: placed on the canvas as an audio element. Speech in it is transcribed with the local speech model before sending, and the agent can use the clip as a voice, lip-sync or reference audio.
+- **Documents** (PDF, DOCX, Markdown, TXT): shown as file chips; their text goes to the agent, and for a PDF the first pages are attached as images too. PDFs imported onto the canvas keep each page's text, so the agent can read it with `get_canvas`.
+
+While it works, the Agent can post a plan as a checklist and ticks items off. Its tool calls fold into one line ("Ran 17 steps") that you can expand to see each step and how long it took. When the agent returns readable reasoning (for example a local model that sends `reasoning_content` or `<think>` text), it appears as a folded **Thought** line you can expand. Claude Code only returns encrypted thinking, so nothing is shown for it.
 
 ## Settings
 
@@ -56,6 +62,17 @@ Short single-shot tasks (storyboard split, OCR with the Agent engine, brand and 
 - The notification center collects suggestions, comment fixes and finished tasks, and a browser notification fires when a task is done.
 - **Voice input** transcribes with a local speech model.
 
+## Chat frames
+
+Each chat gets its own frame on the canvas, named after the chat. Whatever the Agent makes in that chat (images, videos, audio, web pages) lands in the frame, in order, unless it was asked to put it somewhere else. Edits of an existing image still appear next to that image.
+
+- Select a chat frame and click **Open chat** in its toolbar to switch the Agent panel to that chat.
+- The frame button in the Agent panel header shows the current chat's frame on the canvas.
+
+## Reference frame
+
+A reference frame is a frame the Agent reads with every message. Click **Ref** next to the agent picker under the chat box: the first click creates a **References** frame on the canvas and links it. Drop images, videos, audio or text notes into it; the button shows how many items it holds. Linked items are attached to every message and the notes are passed along as the brief. Click **Ref** again, or **Linked to chat** in the frame's toolbar, to unlink it.
+
 ## Skills
 
 Skills are folders with a `SKILL.md` plus any extra files (images, text). Use the built-in ones, write your own, import a folder, or save a workflow from a chat as a skill. Skills keep version history with rollback. Image files are shown to the agent; text files are included by relevance within a context budget.
@@ -63,6 +80,16 @@ Skills are folders with a `SKILL.md` plus any extra files (images, text). Use th
 ## Memory
 
 The agent remembers things across projects: about you, your taste, your way of working and your assets. It can ask onboarding questions, extract memories from uploaded files, and you can change or forget memories just by asking. An evolution log shows what changed.
+
+The **What I can do on my own** tab in Memory holds the switches:
+
+- **Use memory**: when off, the agent neither reads nor saves memories.
+- **Auto-update memory**: after each finished chat turn, the default agent picks out lasting preferences you mentioned and saves them.
+- **Canvas check-up**: when you open a project that changed since the last check, the canvas is reviewed about a minute later and the problems found are posted to the notification center.
+- **Self-evolving skills**: after every few requests, your latest ones are checked for a workflow you repeat; if there is one it becomes a skill, tagged **Learned** in My Skills with the requests it was learned from.
+- **Daily runs**: how many times a day each of these may run.
+
+These need the Agent turned on and are off by default.
 
 ## Scheduled tasks
 

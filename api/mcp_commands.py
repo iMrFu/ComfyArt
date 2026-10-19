@@ -10,22 +10,59 @@ COMMAND_EVENT = "comfyart-mcp-command"
 DEFAULT_TIMEOUT_S = 20.0
 
 _pending: dict[str, asyncio.Future] = {}
+_pages: dict[str, str] = {}
+
+
+def _open_pages() -> dict[str, str]:
+    live = PromptServer.instance.sockets
+    for client in [c for c in _pages if c not in live]:
+        del _pages[client]
+    return _pages
+
+
+def _target(project: str) -> tuple[str, str]:
+    pages = _open_pages()
+    if project:
+        clients = [c for c, p in pages.items() if p == project]
+        if not clients:
+            raise ValueError(f"project {project} is not open in any browser tab — open it in ComfyArt and retry")
+        return clients[-1], project
+    projects = list(dict.fromkeys(pages.values()))
+    if not projects:
+        raise ValueError("no ComfyArt project is open in a browser tab — open one and retry")
+    if len(projects) > 1:
+        raise ValueError(f"several ComfyArt projects are open ({', '.join(projects)}); connect with ?project=<id> to pick one")
+    return _target(projects[0])
 
 
 async def submit_command(action: str, payload: dict, project: str,
-                         timeout: float = DEFAULT_TIMEOUT_S) -> dict:
+                         timeout: float = DEFAULT_TIMEOUT_S, chat: str = "") -> dict:
+    client, project = _target(project)
     command_id = uuid.uuid4().hex
     future: asyncio.Future = asyncio.get_running_loop().create_future()
     _pending[command_id] = future
     try:
-        PromptServer.instance.send_sync(COMMAND_EVENT, {"id": command_id, "action": action, "project": project, "args": payload})
+        PromptServer.instance.send_sync(COMMAND_EVENT, {"id": command_id, "action": action, "project": project, "chat": chat, "args": payload}, client)
         return await asyncio.wait_for(future, timeout)
     except asyncio.TimeoutError:
+        if client not in _open_pages():
+            raise ValueError(f"the ComfyArt tab of project {project} closed before {action!r} finished")
         raise ValueError(
-            f"no ComfyArt page answered the {action!r} command within {timeout:.0f}s — "
-            f"the project {project or '(any)'} must stay open in a browser tab")
+            f"the ComfyArt page did not finish {action!r} within {timeout:.0f}s; it may still complete — "
+            f"check get_canvas before retrying")
     finally:
         _pending.pop(command_id, None)
+
+
+@routes.post("/comfyart/mcp_page")
+async def register_page(request: web.Request) -> web.Response:
+    body = await json_body(request)
+    client, project = str(body.get("client_id") or ""), str(body.get("project") or "")
+    if not client or not project:
+        return web.json_response({"error": "client_id and project are required"}, status=400)
+    _pages.pop(client, None)
+    _pages[client] = project
+    return web.json_response({"ok": True})
 
 
 @routes.post("/comfyart/mcp_command_result")

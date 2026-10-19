@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useActions, useEditor, useValue, type Editor, type TLShape } from 'tldraw'
 
 import { booleanOp, type BoolOp } from '../booleans'
+import { openCanvasChat } from '../canvasChat'
 import { errorText, mediaAsset } from '../jobs'
 import { download, downloadUrl, exportPsd } from '../psd'
 import { VECTOR } from '../shapes/VectorShape'
@@ -85,6 +86,7 @@ export function MultiToolbar({ onError }: { onError: (msg: string) => void }) {
 
   return (
     <div ref={bar} className="ca-bar ca-toolbar" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
+      <Btn icon={Icons.comment} label={t('canvasChat.chat')} title="Shift Enter" onClick={() => openCanvasChat(editor)} />
       <Btn icon={Icons.grid} label={t('multiToolbar.tidyUp')} onClick={() => arrange(editor, shapes)} />
       <Btn icon={Icons.box} label={t('canvasMenu.group')} onClick={() => editor.groupShapes(ids)} />
       <Btn icon={Icons.merge} label={t('canvasMenu.mergeLayers')} onClick={() => actions['flatten-to-image']?.onSelect('toolbar')} />

@@ -1,8 +1,9 @@
 from ..mcp_commands import submit_command
-from ._context import PROJECT
+from ._context import BOT_CHAT_ID, PROJECT
 from .bot_tools import maybe_ask_run_approval
 
 WAIT_MAX_S = 170
+SLOW_S = 90.0
 
 _ID = {"type": "string", "description": "shape id exactly as get_canvas returns it, e.g. shape:abc"}
 _IDS = {"type": "array", "items": {"type": "string"}}
@@ -25,7 +26,7 @@ def _relay(action: str, *, timeout: float = 20.0, approval: str = ""):
             blocked = await maybe_ask_run_approval(f"{approval}{'：' + label if label else ''}")
             if blocked is not None:
                 return blocked
-        result = await submit_command(action, args, PROJECT.get(), timeout)
+        result = await submit_command(action, args, PROJECT.get(), timeout, chat=BOT_CHAT_ID.get())
         image = result.pop("png", None)
         if image:
             result["_images"] = [{"data": image, "mime": "image/png"}]
@@ -45,13 +46,14 @@ def _tool(description: str, properties: dict, required: list[str] = (), **relay)
 SPECS: dict[str, dict] = {
     "get_canvas": _tool(
         "List the open project: pages, the current page's frames and shapes (id, type, name or text, "
-        "x/y/width/height, parent, image or video URL and its pixel size, generation prompt), the selection, the linked "
+        "x/y/width/height, parent, image or video URL and its pixel size, generation prompt, the text of "
+        "imported PDF pages), the selection, the linked "
         "brand kit and running generations. page selects another page by id or name.",
         {"page": {"type": "string"}}),
     "view_canvas": _tool(
         "Render real pixels of the current page (default), of some shapes or frames (ids), so you can "
         "see layout and results. max_px caps the long side (default 1024).",
-        {"ids": _IDS, "max_px": {"type": "integer"}}),
+        {"ids": _IDS, "max_px": {"type": "integer"}}, timeout=SLOW_S),
     "list_models": _tool(
         "Installed image and video models with ids, what they are good at, whether they accept "
         "reference images, and supported ratios.", {}),
@@ -78,7 +80,7 @@ SPECS: dict[str, dict] = {
         "describe the shot; a tag only mentioned in passing is ignored. motion_video (a video shape id) "
         "makes the person in first_frame copy that video's body motion. speech_audio (an audio shape id) "
         "makes the person in first_frame say that audio with matching lip movement; the video lasts as long "
-        "as the audio (max 15 s). duration in seconds (5, 10 or 15).",
+        "as the audio. duration in seconds (5, 10 or 15).",
         {"prompt": {"type": "string"}, "model": {"type": "string"}, "ratio": {"type": "string"},
          "duration": {"type": "integer"}, "first_frame": {"type": "string"}, "last_frame": {"type": "string"},
          "reference_images": _IDS, "reference_videos": _IDS, "reference_audios": _IDS,
@@ -107,7 +109,7 @@ SPECS: dict[str, dict] = {
         {"id": _ID, "left": _POINT, "top": _POINT, "right": _POINT, "bottom": _POINT, "prompt": {"type": "string"}},
         ["id"], approval="扩图"),
     "split_layers": _tool(
-        "Split an image shape into separate transparent layers (layers 2-8).",
+        "Split an image shape into separate transparent layers (layers: how many, default 4).",
         {"id": _ID, "layers": {"type": "integer"}, "prompt": {"type": "string"}}, ["id"], approval="图层拆分"),
     "change_angle": _tool(
         "Re-render an image shape from another camera angle: horizontal -180..180 degrees, vertical "
@@ -141,7 +143,7 @@ SPECS: dict[str, dict] = {
     "vectorize_image": _tool(
         "Trace an image shape into an SVG vector image placed next to it (best for logos, icons, flat "
         "art). Returns the new shape id at once.",
-        {"id": _ID}, ["id"]),
+        {"id": _ID}, ["id"], timeout=SLOW_S),
     "upscale_video": _tool(
         "Upscale a video shape to target 1080p, 2K or 4K (long side).",
         {"id": _ID, "target": {"type": "string", "enum": ["1080p", "2K", "4K"]}}, ["id"], approval="视频放大"),
@@ -160,21 +162,16 @@ SPECS: dict[str, dict] = {
         ["prompt"], approval="生成配乐"),
     "generate_sound_effect": _tool(
         "Generate a short sound effect (an audio element) from an English description. duration in "
-        "seconds (default 8, max 47). Returns ids for wait_generation.",
+        "seconds (default 8; Stable Audio is trained on clips up to 47 s). Returns ids for wait_generation.",
         {"prompt": {"type": "string"}, "duration": {"type": "integer"}}, ["prompt"], approval="生成音效"),
     "text_to_speech": _tool(
-        "Read text aloud as an audio element. model selects the TTS engine: 'voxcpm2' (default, local "
-        "VoxCPM2 model) supports voice_design, a text description of the voice such as 'gentle young "
-        "Chinese female'; 'voxcpm2_clone' clones the reference audio shape; 'kokoro' uses built-in "
-        "speakers and needs the KokoroSpeaker node. voice is a Kokoro voice id (zf_/zm_ Chinese, etc.) "
-        "used only with model='kokoro'. reference is an audio shape id used for cloning. "
-        "Returns ids for wait_generation.",
-        {"text": {"type": "string"},
-         "model": {"type": "string", "enum": ["voxcpm2", "voxcpm2_clone", "kokoro"],
-                   "description": "TTS engine (default voxcpm2)"},
-         "voice": {"type": "string", "description": "Kokoro voice id (model=kokoro only)"},
-         "voice_design": {"type": "string", "description": "voice description for model=voxcpm2"},
-         "reference": _ID},
+        "Read text aloud as an audio element. voice is a built-in voice id (zf_/zm_ Chinese female/male, "
+        "af_/am_ American, bf_/bm_ British, jf_/jm_ Japanese; default zf_xiaoxiao; on Comfy Cloud the Qwen3-TTS speakers "
+        "Serena, Vivian, Uncle_fu, Dylan, Eric, Ryan, Aiden, Ono_anna, Sohee; default Serena), or pass reference "
+        "(an audio shape id) to clone that recording's voice. model 'voxcpm2' uses VoxCPM2 with voice_design "
+        "(a free-text voice description) instead of a preset voice. Returns ids for wait_generation.",
+        {"text": {"type": "string"}, "voice": {"type": "string"}, "reference": _ID,
+         "model": {"type": "string", "enum": ["voxcpm2"]}, "voice_design": {"type": "string"}},
         ["text"], approval="生成配音"),
     "edit_elements": _tool(
         "Turn the text inside an image shape into editable text: OCR finds each line, the text is erased "
@@ -194,7 +191,7 @@ SPECS: dict[str, dict] = {
         "places the result as a normal image and returns its id.",
         {"id": _ID, "design": {"type": "string"}, "x": _POINT, "y": _POINT, "scale": _POINT,
          "rotation": _POINT, "warp": _POINT, "bake": {"type": "boolean"}},
-        ["id"]),
+        ["id"], timeout=SLOW_S),
     "image_to_3d": _tool(
         "Turn an image shape (best: one object on a plain background) into a textured 3D model placed next "
         "to it. Takes a few minutes. Returns ids for wait_generation.",
@@ -245,56 +242,6 @@ SPECS: dict[str, dict] = {
     "focus": _tool(
         "Show shapes to the user: switch page if needed, select them and zoom to them.",
         {"ids": _IDS}, ["ids"]),
-    "concat_videos": _tool(
-        "Concatenate two or more video shapes on the canvas into one longer video, in order, optionally "
-        "trimming each clip. clips is an ordered list: each item is either a video shape id (whole clip) "
-        "or {source|url: shape id, in?: seconds, out?: seconds} to keep only the sub-range [in, out]. "
-        "sources (legacy) is still accepted as a list of whole-clip shape ids. audio picks the sound: "
-        "'concat' keeps and joins every clip's audio, 'first' keeps only the first clip's audio (rest "
-        "silent), 'none' drops audio entirely. Returns the new video shape id, its view URL, width/height, "
-        "duration in seconds, segment count, per-segment in/out and the effective audio mode.",
-        {"clips": {
-            "type": "array",
-            "minItems": 2,
-            "items": {
-                "oneOf": [
-                    {"type": "string", "description": "video shape id — use the whole clip"},
-                    {"type": "object", "properties": {
-                        "source": {"type": "string", "description": "video shape id"},
-                        "url": {"type": "string", "description": "video view url (alternative to source)"},
-                        "in": {"type": "number", "description": "start second (optional, default 0)"},
-                        "out": {"type": "number", "description": "end second (optional, default clip end)"},
-                    }},
-                ],
-            },
-            "description": "ordered clips to join (2+): id/whole or {source|url, in?, out?}",
-        },
-         "sources": {"type": "array", "items": {"type": "string"}, "description": "legacy: list of whole-clip shape ids"},
-         "audio": {"type": "string", "enum": ["concat", "first", "none"], "description": "how to handle audio"}},
-        ["clips"], timeout=120),
-    "mix_audio_video": _tool(
-        "Merge a narration audio shape into a (trimmed) video shape and output a final video. The "
-        "narration can be cut first: audio_clips is an optional ordered list of {in?, out?, at?} where "
-        "each item cuts the audio sub-range [in, out] and places it at second 'at' on the video "
-        "timeline (omit the list to use the whole audio from 0, or pass a single item for a one-cut trim). "
-        "mode controls the soundtrack: 'replace' swaps the video's audio for the narration (gaps silent), "
-        "'mix' keeps the original audio and overlays the narration on top (volume / bg_volume adjustable). "
-        "video / audio are shape ids; optional video_in / video_out trim the video first. Returns the new "
-        "video shape id, its view URL, width/height, duration, the merge mode and the per-segment list.",
-        {"video": _ID, "audio": _ID,
-         "mode": {"type": "string", "enum": ["replace", "mix"],
-                  "description": "replace original audio (default) or mix narration over it"},
-         "audio_clips": {"type": "array",
-                         "items": {"type": "object", "properties": {
-                             "in": {"type": "number", "description": "cut start second (default 0)"},
-                             "out": {"type": "number", "description": "cut end second (default audio end)"},
-                             "at": {"type": "number", "description": "place at this second on the video timeline (default 0)"}}},
-                         "description": "optional narration cuts; omit to use whole audio"},
-         "volume": {"type": "number", "description": "narration volume (default 1.0)"},
-         "bg_volume": {"type": "number", "description": "original audio volume in mix mode (default 1.0)"},
-         "video_in": {"type": "number", "description": "trim video from this second"},
-         "video_out": {"type": "number", "description": "trim video to this second"}},
-        ["video", "audio"], timeout=120),
     "memory": _tool(
         "The user's long-term memory across projects. action list; add with text and category (about, "
         "taste, work, assets); correct with old (copied exactly) and new; forget with text (copied "
@@ -310,6 +257,25 @@ SPECS: dict[str, dict] = {
         {"action": {"type": "string", "enum": ["list", "read", "save"]}, "name": {"type": "string"},
          "path": {"type": "string"}, "instructions": {"type": "string"}},
         ["action"]),
+    "concat_videos": _tool(
+        "Concatenate two or more video or image clips on the canvas into one video. clips (or sources) is a "
+        "list of shape ids, or objects {source|url, in?, out?} to trim each clip. audio: 'first' keeps the "
+        "first clip's audio, 'concat' mixes every clip's audio, 'none' (default) mutes. Returns the merged "
+        "video shape id and URL.",
+        {"clips": {"type": "array", "items": {"type": "string"}},
+         "sources": {"type": "array", "items": {"type": "string"}},
+         "audio": {"type": "string", "enum": ["first", "concat", "none"]}},
+        [], approval="拼接视频"),
+    "mix_audio_video": _tool(
+        "Mix an audio track into a video shape, or replace its audio. video and audio are shape ids. "
+        "mode 'replace' swaps the audio track; 'mix' overlays the new audio under the original. audio_clips: "
+        "optional list of {in, out, at} to place segments; volume / bg_volume (0-1) scale the overlay / "
+        "original; video_in / video_out (seconds) trim the video.",
+        {"video": _ID, "audio": _ID, "mode": {"type": "string", "enum": ["replace", "mix"]},
+         "audio_clips": {"type": "array", "items": _schema({"in": _POINT, "out": _POINT, "at": _POINT})},
+         "volume": {"type": "number"}, "bg_volume": {"type": "number"},
+         "video_in": {"type": "number"}, "video_out": {"type": "number"}},
+        ["video", "audio"], timeout=120, approval="混音"),
 }
 
 TOOLS: dict[str, dict] = {
