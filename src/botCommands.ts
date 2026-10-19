@@ -1,4 +1,4 @@
-import { react, type Editor, type TLImageShape, type TLShapeId, type TLVideoShape } from 'tldraw'
+import { react, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
 import * as actions from './actions'
 import { generateAudio, imageTo3d, voices } from './assetGen'
