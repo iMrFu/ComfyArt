@@ -276,6 +276,17 @@ SPECS: dict[str, dict] = {
          "volume": {"type": "number"}, "bg_volume": {"type": "number"},
          "video_in": {"type": "number"}, "video_out": {"type": "number"}},
         ["video", "audio"], timeout=120, approval="混音"),
+    "custom_workflow": _tool(
+        "Connect the user's own ComfyUI workflow to a ComfyArt feature (image generation, edit, inpaint, "
+        "upscale, video...). action rules: how to mark the nodes, read it first. list: each feature's "
+        "markers, its uploaded files and the one in use. check: validate workflow (API-format JSON "
+        "object) or file for a feature and report what to fix. install: save workflow as name for "
+        "feature and use it (refused while check has errors). assign: give feature one of its files, or "
+        "file \"\" to switch back to built in. There is no delete; the user removes files on disk.",
+        {"action": {"type": "string", "enum": ["rules", "list", "check", "install", "assign"]},
+         "feature": {"type": "string"}, "workflow": {"type": "object"}, "file": {"type": "string"},
+         "name": {"type": "string"}},
+        ["action"]),
 }
 
 TOOLS: dict[str, dict] = {

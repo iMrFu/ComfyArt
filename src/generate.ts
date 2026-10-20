@@ -1,11 +1,13 @@
 import { createShapeId, type Editor, type TLShape, type TLShapeId } from 'tldraw'
 
-import { loadWorkflow, mediaMeta, refKind, uploadImage, viewUrl, type PromptGraph, type RefKind } from './comfy'
+import { defaultTarget, loadNamed, loadWorkflow, mediaMeta, refKind, uploadImage, validTarget, viewUrl, type PromptGraph, type RefKind } from './comfy'
 import type { LoraPick } from './loras'
 import { ask, stripThink } from './llm'
 import { freeSpot, spawnHolder, startJob, type ErrorSink, type GenInfo } from './jobs'
 import { GENERATOR, type GeneratorShape } from './shapes/GeneratorShape'
 import { agentModels, isVideo, modelOf } from './models'
+import { CUSTOM_GENERATE, customGraph, withAlpha } from './customWorkflows'
+import { t } from './i18n'
 import { applyRefs, PALETTE_MODE, refControlsOf, refHints, refLimit, refModesOf, refStrengthsOf, usableRefs } from './refModes'
 import { paletteImage, palettePrompt } from './palette'
 import { annotated, randomSeed, type Built } from './workflows'
@@ -30,7 +32,6 @@ export const motionOf = (shape: GeneratorShape) => (shape.meta.motion as string 
 export const speechOf = (shape: GeneratorShape) => (shape.meta.speech as string | undefined) ?? null
 
 const SHORT_SIDE: Record<string, number> = { '1K': 1024, '2K': 2048 }
-const [PROMPT, LATENT, RESULT] = ['6', '5', '9']
 
 function ratioOf(ratio: string): number {
   const [a, b] = ratio.split(':').map(Number)
@@ -87,6 +88,7 @@ export function colorsOf(shape: GeneratorShape): string[] {
 
 export const negativeOf = (shape: GeneratorShape) => (shape.meta.negative as string | undefined) ?? ''
 export const seedOf = (shape: GeneratorShape) => (shape.meta.seed as number | null | undefined) ?? null
+export const runOnOf = (shape: GeneratorShape) => validTarget(shape.meta.runOn) ?? defaultTarget()
 export const lorasOf = (shape: GeneratorShape) => (shape.meta.loras as LoraPick[] | undefined) ?? []
 
 function applySeed(graph: PromptGraph, seed: number) {
@@ -96,10 +98,10 @@ function applySeed(graph: PromptGraph, seed: number) {
   }
 }
 
-function applyLoras(graph: PromptGraph, loras: LoraPick[]) {
-  const unet = JSON.stringify(['1', 0])
-  const consumers = Object.values(graph).filter((n) => JSON.stringify(n.inputs.model) === unet)
-  let model: [string, number] = ['1', 0]
+function applyLoras(graph: PromptGraph, unet: string, loras: LoraPick[]) {
+  const source = JSON.stringify([unet, 0])
+  const consumers = Object.values(graph).filter((n) => JSON.stringify(n.inputs.model) === source)
+  let model: [string, number] = [unet, 0]
   loras.forEach(({ name, strength }, i) => {
     graph[`lora${i}`] = { class_type: 'LoraLoaderModelOnly', inputs: { model, lora_name: name, strength_model: strength / 100 } }
     model = [`lora${i}`, 0]
@@ -150,38 +152,44 @@ async function generateGraph(shape: GeneratorShape): Promise<Built> {
       : t2vGraph(prompt, ratioOf(ratio), duration, area)
   }
   const [width, height] = targetSize(shape.props)
+  if (model?.id === CUSTOM_GENERATE) {
+    const custom = await customGraph('generate', { prompt, width, height, count }, transparent ? withAlpha : undefined)
+    if (!custom) throw new Error(t('customWorkflows.generateGone', model.label))
+    return custom
+  }
   if (!model) throw new Error('unknown image model')
-  const graph = await loadWorkflow(model.id)
-  graph[PROMPT].inputs[model.prompt!] = model.caption ? await caption(model.caption, prompt, width, height) : prompt
-  if (model.negative) graph[model.negative[0]].inputs[model.negative[1]] = negativeOf(shape)
-  if (model.lora) applyLoras(graph, lorasOf(shape))
-  applyRefs(graph, model, used, refStrengthsOf(shape), refControlsOf(shape), width, height)
-  for (const id of model.sizes!) Object.assign(graph[id].inputs, { width, height })
-  graph[LATENT].inputs.batch_size = count
+  const extra = [...model.sizes!, model.steps?.[0], model.negative?.[0], model.refs === 'latent' && 'guider'].filter((n) => typeof n === 'string')
+  const { graph, id } = await loadNamed(model.id, 'unet', 'vae', 'prompt', 'size', 'sampler', 'decode', 'save', ...extra)
+  graph[id.prompt].inputs[model.prompt!] = model.caption ? await caption(model.caption, prompt, width, height) : prompt
+  if (model.negative) graph[id[model.negative[0]]].inputs[model.negative[1]] = negativeOf(shape)
+  if (model.lora) applyLoras(graph, id.unet, lorasOf(shape))
+  applyRefs(graph, id, model, used, refStrengthsOf(shape), refControlsOf(shape), width, height)
+  for (const name of model.sizes!) Object.assign(graph[id[name]].inputs, { width, height })
+  graph[id.size].inputs.batch_size = count
   const base = baseOf(shape)
   if (base) {
     graph.b0 = { class_type: 'LoadImage', inputs: { image: annotated(base.src) } }
     graph.b1 = { class_type: 'ImageScale', inputs: { image: ['b0', 0], upscale_method: 'lanczos', width, height, crop: 'center' } }
-    graph.b2 = { class_type: 'VAEEncode', inputs: { pixels: ['b1', 0], vae: [model.vae!, 0] } }
+    graph.b2 = { class_type: 'VAEEncode', inputs: { pixels: ['b1', 0], vae: [id.vae, 0] } }
     graph.b3 = { class_type: 'RepeatLatentBatch', inputs: { samples: ['b2', 0], amount: count } }
-    graph['7'].inputs.latent_image = ['b3', 0]
-    if (graph['7'].class_type === 'KSampler') graph['7'].inputs.denoise = base.strength / 100
+    graph[id.sampler].inputs.latent_image = ['b3', 0]
+    if (graph[id.sampler].class_type === 'KSampler') graph[id.sampler].inputs.denoise = base.strength / 100
     else {
-      graph.b4 = { class_type: 'SplitSigmasDenoise', inputs: { sigmas: graph['7'].inputs.sigmas, denoise: base.strength / 100 } }
-      graph['7'].inputs.sigmas = ['b4', 1]
+      graph.b4 = { class_type: 'SplitSigmasDenoise', inputs: { sigmas: graph[id.sampler].inputs.sigmas, denoise: base.strength / 100 } }
+      graph[id.sampler].inputs.sigmas = ['b4', 1]
     }
   }
-  if (model.steps) graph[model.steps[0]].inputs.steps = model.steps[1][quality] ?? model.steps[1].standard
+  if (model.steps) graph[id[model.steps[0]]].inputs.steps = model.steps[1][quality] ?? model.steps[1].standard
   if (transparent) {
     Object.assign(graph, {
       bg1: { class_type: 'LoadBackgroundRemovalModel', inputs: { bg_removal_name: 'birefnet.safetensors' } },
-      bg2: { class_type: 'RemoveBackground', inputs: { bg_removal_model: ['bg1', 0], image: ['8', 0] } },
+      bg2: { class_type: 'RemoveBackground', inputs: { bg_removal_model: ['bg1', 0], image: [id.decode, 0] } },
       bg3: { class_type: 'InvertMask', inputs: { mask: ['bg2', 0] } },
-      bg4: { class_type: 'JoinImageWithAlpha', inputs: { image: ['8', 0], alpha: ['bg3', 0] } },
+      bg4: { class_type: 'JoinImageWithAlpha', inputs: { image: [id.decode, 0], alpha: ['bg3', 0] } },
     })
-    graph[RESULT].inputs.images = ['bg4', 0]
+    graph[id.save].inputs.images = ['bg4', 0]
   }
-  return { graph, result: RESULT }
+  return { graph, result: id.save }
 }
 
 export function generate(editor: Editor, shape: GeneratorShape, onError: ErrorSink) {
@@ -189,7 +197,7 @@ export function generate(editor: Editor, shape: GeneratorShape, onError: ErrorSi
   const name = shape.props.prompt || scenesOf(shape)[0]?.prompt || ''
   const seed = seedOf(shape) ?? randomSeed()
   const built = generateGraph(shape).then((b) => { applySeed(b.graph, seed); return b })
-  return startJob(editor, shape.id, built, { name: name.slice(0, 32), kind, extra: { seed } }, onError)
+  return startJob(editor, shape.id, built, { name: name.slice(0, 32), kind, extra: { seed }, runOn: runOnOf(shape) }, onError)
 }
 
 export function genInfoOf(shape: TLShape): GenInfo | null {

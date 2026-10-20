@@ -28,7 +28,7 @@ export type RefShape = TLImageShape | TLVideoShape | AudioShape
 export interface ChatDoc { src: string; name: string }
 
 export const docsAtom = atom<ChatDoc[]>('agent docs', [])
-export const DOC_ACCEPT = '.pdf,.docx,.md,.markdown,.txt'
+export const DOC_ACCEPT = '.pdf,.docx,.md,.markdown,.txt,.json'
 export const isRefShape = (s: TLShape): s is RefShape => s.type === 'image' || s.type === 'video' || s.type === AUDIO
 
 export const srcOf = (editor: Editor, shape: RefShape): string | null => fileSrc(editor, shape)

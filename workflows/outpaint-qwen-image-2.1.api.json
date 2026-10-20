@@ -79,6 +79,9 @@
         "6",
         2
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "8": {
@@ -102,12 +105,18 @@
         "28",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   },
   "11": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "example.png"
+    },
+    "_meta": {
+      "title": "@image"
     }
   },
   "21": {
@@ -122,6 +131,9 @@
         "11",
         0
       ]
+    },
+    "_meta": {
+      "title": "@pad"
     }
   },
   "22": {
@@ -174,6 +186,9 @@
       "string_a": "Outpaint the image: fill the solid white border areas with a seamless, natural continuation of the scene, matching perspective, lighting and style. Keep the original picture in the center unchanged.",
       "string_b": "",
       "delimiter": " Scene: "
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "26": {
@@ -207,6 +222,9 @@
         "11",
         0
       ]
+    },
+    "_meta": {
+      "title": "@blendPad"
     }
   },
   "28": {

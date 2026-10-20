@@ -47,6 +47,7 @@ def _install_stubs() -> None:
     comfy = _make_module("comfy")
     comfy.ops = _make_module("comfy.ops", manual_cast=object)
     comfy.sd = _make_module("comfy.sd", load_diffusion_model=lambda *a, **k: None)
+    comfy.cli_args = _make_module("comfy.cli_args", args=types.SimpleNamespace(tls_keyfile=None, tls_certfile=None))
 
     from aiohttp import web
 
@@ -68,6 +69,7 @@ def _install_stubs() -> None:
 
     ps = _PromptServer()
     ps.routes = web.RouteTableDef()
+    ps.address = "127.0.0.1"
     ps.port = 8188
     ps.user_manager = _UserManager()
     ps.prompt_queue = _Queue()

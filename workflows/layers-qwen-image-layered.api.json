@@ -7,12 +7,18 @@
         "83:8",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   },
   "74": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "coastal_smiling_woman.png"
+    },
+    "_meta": {
+      "title": "@image"
     }
   },
   "82": {
@@ -24,12 +30,18 @@
         "74",
         0
       ]
+    },
+    "_meta": {
+      "title": "@scale"
     }
   },
   "116": {
     "class_type": "PrimitiveStringMultiline",
     "inputs": {
       "value": "A cinematic medium shot of a beautiful young woman with fair skin and a joyful, radiant smile, looking back over her shoulder. She has voluminous, curly auburn hair styled in a loose, windblown updo. She is standing on a rugged, rocky coastline overlooking a sun-drenched ocean. She wears a vintage, long-sleeved, high-collared dress in an off-white, crinkled fabric with delicate smocking on the bodice and a simple brown sash at her waist. In the background, the ocean sparkles brightly under the sun, and a majestic tall ship with full sails is visible in the distance. The scene is illuminated by the warm, golden light of the late afternoon, creating a soft, romantic, and nostalgic atmosphere with a shallow depth of field that keeps the woman in sharp focus."
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "83:38": {
@@ -180,6 +192,9 @@
         "83:118",
         0
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "83:78": {
@@ -204,6 +219,9 @@
         "83:78",
         1
       ]
+    },
+    "_meta": {
+      "title": "@latent"
     }
   },
   "83:37": {

@@ -9,6 +9,9 @@
         0
       ],
       "format.codec": "auto"
+    },
+    "_meta": {
+      "title": "@save"
     }
   },
   "119": {
@@ -127,6 +130,9 @@
     "class_type": "RandomNoise",
     "inputs": {
       "noise_seed": 1
+    },
+    "_meta": {
+      "title": "@seed"
     }
   },
   "130": {
@@ -164,6 +170,9 @@
         "132",
         1
       ]
+    },
+    "_meta": {
+      "title": "@prompt @size"
     }
   },
   "132": {
@@ -180,6 +189,9 @@
     "class_type": "PrimitiveFloat",
     "inputs": {
       "value": 2
+    },
+    "_meta": {
+      "title": "@seconds"
     }
   },
   "134": {

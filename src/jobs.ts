@@ -1,6 +1,6 @@
 import { AssetRecordType, atom, createShapeId, type Editor, type JsonValue, type TLAssetId, type TLImageAsset, type TLShape, type TLShapeId, type TLVideoAsset } from 'tldraw'
 
-import { cancelPrompt, mediaMeta, queuePrompt, viewUrl, waitForImages, type ImageRef } from './comfy'
+import { cancelPrompt, mediaMeta, queuePrompt, refKind, viewUrl, waitForImages, type ImageRef } from './comfy'
 import { GENERATOR, type GeneratorShape } from './shapes/GeneratorShape'
 import type { Built } from './workflows'
 import { t } from './i18n'
@@ -90,7 +90,7 @@ export interface GenInfo {
   inputs?: Record<string, JsonValue>
 }
 
-const GEN_INPUTS = ['refs', 'base', 'strength', 'colors', 'refModes', 'refStrengths', 'refControls', 'lastFrame', 'scenes', 'videoMode', 'motion', 'speech', 'negative', 'seed', 'loras']
+const GEN_INPUTS = ['refs', 'base', 'strength', 'colors', 'refModes', 'refStrengths', 'refControls', 'lastFrame', 'scenes', 'videoMode', 'motion', 'speech', 'negative', 'seed', 'loras', 'runOn']
 
 function infoOf(holder: TLShape, job: Job): GenInfo {
   if (holder.type !== GENERATOR) return { tool: job.name }
@@ -136,7 +136,7 @@ async function finish(editor: Editor, holderId: TLShapeId, job: Job, onError: Er
   try {
     const refs = await waitForImages(job.id, job.node)
     settled.add(job.id)
-    const media = await Promise.all(refs.map((r) => toMedia(r, job.kind)))
+    const media = await Promise.all(refs.map((r) => toMedia(r, refKind(viewUrl(r)) === 'video' ? 'video' : job.kind)))
     const holder = editor.getShape(holderId)
     if (!holder) return
     await (placers[job.placer ?? ''] ?? defaultPlacer)(editor, holder, media, job, onError)
@@ -158,13 +158,13 @@ export async function startJob(
   editor: Editor,
   holderId: TLShapeId,
   build: Promise<Built>,
-  opts: { name: string; kind?: MediaKind; placer?: string; extra?: Record<string, unknown> },
+  opts: { name: string; kind?: MediaKind; placer?: string; extra?: Record<string, unknown>; runOn?: string },
   onError: ErrorSink,
 ) {
   try {
     const { graph, result } = await build
     const job: Job = {
-      id: await queuePrompt(graph),
+      id: await queuePrompt(graph, opts.runOn),
       node: result,
       name: opts.name,
       kind: opts.kind ?? 'image',

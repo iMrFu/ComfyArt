@@ -1,5 +1,5 @@
 {
-  "1": { "class_type": "LoadImage", "inputs": { "image": "" } },
+  "1": { "class_type": "LoadImage", "inputs": { "image": "" }, "_meta": { "title": "@image" } },
   "2": { "class_type": "LoadBackgroundRemovalModel", "inputs": { "bg_removal_name": "birefnet.safetensors" } },
   "3": { "class_type": "RemoveBackground", "inputs": { "bg_removal_model": ["2", 0], "image": ["1", 0] } },
   "4": { "class_type": "ImageCropToMask", "inputs": { "images": ["1", 0], "masks": ["3", 0], "width": 1024, "height": 1024, "pad_factor": 1.1, "grow_mask": 0, "background": "#000000" } },
@@ -28,5 +28,5 @@
   "27": { "class_type": "DecimateMesh", "inputs": { "mesh": ["26", 0], "target_face_count": 200000, "placement_mode": "midpoint" } },
   "28": { "class_type": "MeshSmoothNormals", "inputs": { "mesh": ["27", 0], "crease_angle": 180 } },
   "29": { "class_type": "PaintMesh", "inputs": { "mesh": ["28", 0], "voxel_colors": ["25", 0] } },
-  "30": { "class_type": "SaveGLB", "inputs": { "mesh": ["29", 0], "filename_prefix": "comfyart/model" } }
+  "30": { "class_type": "SaveGLB", "inputs": { "mesh": ["29", 0], "filename_prefix": "comfyart/model" }, "_meta": { "title": "@save" } }
 }

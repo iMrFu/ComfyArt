@@ -31,6 +31,10 @@
 
 项目、项目的快照历史和 Agent 对话都保存在 SQLite 数据库 `user/__comfyart/data.db` 里。旧版本的项目（`comfyart/projects/` 下的 JSON 文件）会在第一次打开 ComfyArt 时自动导入，原文件保留不动。界面语言默认跟随 ComfyUI，可以在设置菜单里随时切换。
 
+## 局域网实例
+
+局域网里其他的 ComfyUI 也能跑 ComfyArt 的任务。对方启动时加 `--listen`，在 设置 → 局域网实例… 里登记（名称、地址、端口，别的都不存）。之后 设置 → 生成位置 决定任务的默认去处：「自动」把任务发给排队最少、并且装齐了工作流所需节点和模型文件的机器，本机也算一台，关机或缺东西的机器会被跳过；选了某一台就排到那台的队列。每张生成卡片还能在模型旁边的「运行在」里单独改。放大、去背景这类工具按默认去处走，运行中的卡片会显示任务去了哪台机器。输入文件会上传到对方的 `input/comfyart/`，进度照常显示在画布上，结果下载到本机 `output/comfyart/`，文件名带 `<机器>-<任务>` 后缀。模型按文件名匹配，各台机器放在不同子目录也没关系。Qwen Image 2512 的加载器要求那台机器也装了 ComfyArt。
+
 ## Agent
 
 Agent 面板在后端运行一个真正会调用工具的 Agent，移植自 [ComfyTV](https://github.com/jtydhr88/ComfyTV) 的 bot。默认关闭：在「Agent 设置」里打开 MCP 和 Agent 即可。图像、视频模式不依赖它。每个对话可以单独选择 Agent：
@@ -88,6 +92,7 @@ Claude Code、Codex、Gemini CLI、Qwen Code、Cursor、VS Code、Claude Desktop
 
 - `ComfyArt Precise UNET Loader` 用 manual cast 算子加载扩散模型。ComfyUI 的 `--fast fp8_matrix_mult` 会把 Qwen Image 2512 这类未缩放的 fp8 权重跑成噪点；这个加载器让它加载的模型绕开那条路径。
 - `/comfyart/bot/*`（对话、发送、停止、分支、回答）、`/comfyart/settings` 和 `/comfyart/mcp` 服务于 Agent。
+- `/comfyart/instances` 列出、添加、修改、删除局域网实例；`/comfyart/instances/status` 返回哪些在线以及各自的队列和扩散模型。`POST /comfyart/remote/prompt` 选机器（`target` 是实例 id 或 `auto`）并把任务排上去；`GET /comfyart/remote/history/{instance}/{job}` 和 `POST /comfyart/remote/cancel/{instance}/{job}` 跟进这个任务。
 - `POST /comfyart/pdf` 把上传的 PDF 前 30 页渲染成 PNG，存到 `input/comfyart/pdf/`，并连同每页文字一起返回。
 - `POST /comfyart/ocr` 在本机用 RapidOCR 识别图片里的文字行，返回每行文字和位置框。
 

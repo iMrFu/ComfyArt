@@ -4,6 +4,9 @@
     "inputs": {
       "unet_name": "ideogram4_fp8_scaled.safetensors",
       "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "@unet"
     }
   },
   "15": {
@@ -25,6 +28,9 @@
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "flux2-vae.safetensors"
+    },
+    "_meta": {
+      "title": "@vae"
     }
   },
   "5": {
@@ -33,6 +39,9 @@
       "width": 1024,
       "height": 1024,
       "batch_size": 1
+    },
+    "_meta": {
+      "title": "@size"
     }
   },
   "6": {
@@ -43,6 +52,9 @@
         "2",
         0
       ]
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "10": {
@@ -102,6 +114,9 @@
       "height": 1024,
       "mu": 0.0,
       "std": 1.75
+    },
+    "_meta": {
+      "title": "@scheduler"
     }
   },
   "14": {
@@ -133,6 +148,9 @@
         "5",
         0
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "8": {
@@ -146,6 +164,9 @@
         "3",
         0
       ]
+    },
+    "_meta": {
+      "title": "@decode"
     }
   },
   "9": {
@@ -156,6 +177,9 @@
         "8",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   }
 }

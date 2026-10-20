@@ -3,6 +3,9 @@
     "class_type": "LoadImage",
     "inputs": {
       "image": "example.png"
+    },
+    "_meta": {
+      "title": "@image"
     }
   },
   "2": {
@@ -10,6 +13,9 @@
     "inputs": {
       "image": "example.png",
       "channel": "alpha"
+    },
+    "_meta": {
+      "title": "@mask"
     }
   },
   "4": {
@@ -34,6 +40,9 @@
         "2",
         0
       ]
+    },
+    "_meta": {
+      "title": "@inpaint"
     }
   },
   "6": {
@@ -44,6 +53,9 @@
         "5",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   }
 }

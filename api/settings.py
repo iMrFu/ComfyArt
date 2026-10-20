@@ -16,6 +16,7 @@ SETTINGS_SPEC: dict[str, object] = {
     "bot-comfy-mcp-command": "",
     "ocr-engine": "local",
     "generation-backend": "local",
+    "generation-target": "auto",
     "memory-enabled": True,
     "proactive-memory": False,
     "proactive-skills": False,

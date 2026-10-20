@@ -296,3 +296,12 @@
 .ca-reframe__hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; border: 2px dashed var(--ca-border); border-radius: var(--ca-frame-r, 0); color: var(--ca-muted); font: 400 28px/1.4 var(--ca-font); text-align: center; pointer-events: none; }
 .ca-refbtn { white-space: nowrap; flex: none; }
 .ca-refbtn[data-on] { background: var(--ca-active); }
+.ca-workflows__group { display: flex; flex-direction: column; gap: 6px; }
+.ca-workflows__row { display: grid; grid-template-columns: 1fr 1.3fr auto; align-items: center; gap: 4px 8px; font-size: 13px; }
+.ca-workflows__warn { grid-column: 1 / -1; font-size: 12px; color: var(--ca-error-text); }
+.ca-instances { width: min(520px, calc(100vw - 32px)); }
+.ca-instances__row { display: flex; align-items: center; gap: 12px; }
+.ca-instances__name { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.ca-instances__toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ca-instances__add { display: grid; grid-template-columns: 1fr 1.4fr 90px; gap: 8px; }
+.ca-instances__error { padding: 8px 10px; border-radius: 8px; background: var(--ca-error-bg); color: var(--ca-error-text); font-size: 13px; }

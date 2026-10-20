@@ -37,6 +37,10 @@ ComfyArt can run its workflows on [Comfy Cloud](https://cloud.comfy.org) instead
 
 On Cloud, FLUX.2 Klein 9B runs the bf16 `flux-2-klein-9b.safetensors` and Qwen Image 2512 loads with the core `UNETLoader`. Angles imports the QMA LoRA from Hugging Face into your Cloud model library the first time it runs. Voiceover and voice cloning use Qwen3-TTS on Cloud (`speech-qwen3tts`, `voice-clone-qwen3tts`) instead of Kokoro and IndexTTS2, which Cloud does not have.
 
+## LAN instances
+
+Other ComfyUI machines on your network can run ComfyArt jobs too. Start them with `--listen`, and add them under Settings → LAN instances… (name, address, port; nothing else is stored). Settings → Generate on then sets where jobs go by default: Auto sends each job to the least busy machine, this computer included, that has every node and model file the workflow needs, skipping machines that are off or missing something; picking a machine queues jobs there. Each generator card can override it under Run on, next to the model. Tools such as upscale or remove background use the default, and the card shows where a running job went. Input files are uploaded to the machine's `input/comfyart/`, progress shows on the canvas as usual, and results are downloaded into `output/comfyart/` with a `<machine>-<job>` suffix. Model files are matched by file name, so they can sit in different subfolders on each machine. Qwen Image 2512 needs ComfyArt installed on that machine for its loader.
+
 ## Agent
 
 The Agent panel runs a real tool-using agent on the backend, ported from [ComfyTV](https://github.com/jtydhr88/ComfyTV)'s bot. It is off by default: turn on MCP and the Agent in Agent Settings. Image and video modes work without it. Pick the agent per chat:
@@ -95,6 +99,7 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 - `ComfyArt Precise UNET Loader` loads a diffusion model with manual cast ops. ComfyUI's `--fast fp8_matrix_mult` turns unscaled fp8 checkpoints such as Qwen Image 2512 into noise; this loader skips that path for the model it loads.
 - `/comfyart/bot/*` (chats, send, stop, branch, answers), `/comfyart/settings` and `/comfyart/mcp` serve the Agent.
 - `POST /comfyart/cloud/prompt`, `GET /comfyart/cloud/history/{job}` and `POST /comfyart/cloud/cancel/{job}` forward jobs to Comfy Cloud with `COMFY_API_KEY`.
+- `/comfyart/instances` lists, adds, edits and removes LAN instances; `/comfyart/instances/status` reports which are online with their queue and diffusion models. `POST /comfyart/remote/prompt` picks a machine (`target` is an instance id or `auto`) and queues the job there; `GET /comfyart/remote/history/{instance}/{job}` and `POST /comfyart/remote/cancel/{instance}/{job}` follow it.
 - `POST /comfyart/pdf` renders up to 30 pages of an uploaded PDF to PNG files in `input/comfyart/pdf/` and returns them with each page's text.
 - `POST /comfyart/ocr` reads the text lines of an image (RapidOCR, on device) and returns each line with its box.
 

@@ -3,6 +3,9 @@
     "class_type": "LoadImage",
     "inputs": {
       "image": "example.png"
+    },
+    "_meta": {
+      "title": "@image"
     }
   },
   "2": {
@@ -22,6 +25,9 @@
         "1",
         0
       ]
+    },
+    "_meta": {
+      "title": "@upscale"
     }
   },
   "4": {
@@ -32,6 +38,9 @@
         "3",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   }
 }

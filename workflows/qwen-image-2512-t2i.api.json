@@ -3,6 +3,9 @@
     "class_type": "ComfyArtPreciseUNETLoader",
     "inputs": {
       "unet_name": "qwen_image_2512_fp8_e4m3fn.safetensors"
+    },
+    "_meta": {
+      "title": "@unet"
     }
   },
   "2": {
@@ -17,6 +20,9 @@
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "qwen_image_vae.safetensors"
+    },
+    "_meta": {
+      "title": "@vae"
     }
   },
   "4": {
@@ -35,6 +41,9 @@
       "width": 1328,
       "height": 1328,
       "batch_size": 1
+    },
+    "_meta": {
+      "title": "@size"
     }
   },
   "6": {
@@ -45,6 +54,9 @@
         "2",
         0
       ]
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "10": {
@@ -55,6 +67,9 @@
         "2",
         0
       ]
+    },
+    "_meta": {
+      "title": "@negative"
     }
   },
   "7": {
@@ -82,6 +97,9 @@
         "5",
         0
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "8": {
@@ -95,6 +113,9 @@
         "3",
         0
       ]
+    },
+    "_meta": {
+      "title": "@decode"
     }
   },
   "9": {
@@ -105,6 +126,9 @@
         "8",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   }
 }

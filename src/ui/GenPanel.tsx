@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEditor, useValue } from 'tldraw'
 
-import { refKind, thumbUrl, uploadImage, viewUrl, type RefKind } from '../comfy'
+import { cloudMode, refKind, thumbUrl, uploadImage, validTarget, viewUrl, type RefKind } from '../comfy'
 import { planStoryboard } from '../agent'
-import { baseOf, colorsOf, generate, lastFrameOf, motionOf, refsOf, scenesOf, speechOf, targetSize, videoModeOf } from '../generate'
+import { baseOf, colorsOf, generate, lastFrameOf, motionOf, refsOf, runOnOf, scenesOf, speechOf, targetSize, videoModeOf } from '../generate'
 import { canvasPickAtom, fillTarget, isMediaRefs, maxRefsOf, type Target } from '../genInputs'
 import { itemImages, libraryAtom } from '../library'
 import { DEFAULT_STRENGTH, modeOf, modesFor, refControlsOf, refModeFor, refModesOf, refStrengthsOf, usableRefs } from '../refModes'
@@ -11,10 +11,12 @@ import { RefControls } from './RefControls'
 import { errorText, jobOf } from '../jobs'
 import type { GeneratorShape } from '../shapes/GeneratorShape'
 import { installedModels, isVideo, modelOf } from '../models'
+import { instancesAtom } from '../instances'
+import { CUSTOM_GENERATE } from '../customWorkflows'
 import { AssetGrid } from './AssetPicker'
 import { ColorPicker } from './ColorPicker'
 import { AdvancedPill } from './GenAdvanced'
-import { ModelPill, SettingsPill } from './GenSettings'
+import { ModelPill, RunOnPill, SettingsPill } from './GenSettings'
 import { Icons } from './icons'
 import { StoryboardEditor } from './StoryboardEditor'
 import { Popover } from './Popover'
@@ -49,6 +51,7 @@ export function GenPanel({ onError }: { onError: (msg: string) => void }) {
   const models = useValue('gen models', () => installedModels(!!shape && isVideo(shape.props.workflow)), [shape?.props.workflow])
   const running = useValue('gen running', () => !!(shape && jobOf(editor.getShape(shape.id) ?? shape)), [editor, shape])
   const canvasPick = useValue(canvasPickAtom)
+  const lan = useValue('gen lan', () => !cloudMode() && instancesAtom.get().some((i) => i.enabled), [])
   const library = useValue('library images', () => libraryAtom.get().filter((x) => itemImages(x).length), [])
 
   useEffect(() => { prompt.current?.focus() }, [shape?.id])
@@ -182,7 +185,7 @@ export function GenPanel({ onError }: { onError: (msg: string) => void }) {
     : t('genPanel.refNotSupported', model.label)
 
   return (
-    <div ref={panel} className="ca-gen" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+    <div ref={panel} className="ca-gen" data-lan={lan || undefined} style={{ left, top }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
       <div className="ca-gen__refs">
         {refs.map((src) => (
           <span key={src} className="ca-gen__ref" data-off={video || used.includes(src) ? undefined : true} title={video || used.includes(src) ? undefined : unusedReason(src)}>
@@ -244,7 +247,7 @@ export function GenPanel({ onError }: { onError: (msg: string) => void }) {
         {vmode === 'frames' && (last ? slot(last, t('genPanel.lastFrame'), () => setMeta({ lastFrame: null })) : imagePicker('last', t('genPanel.lastFrame')))}
         {vmode === 'motion' && (motion ? slot(motion, t('genPanel.motionVideo'), () => setMeta({ motion: null })) : imagePicker('motion', t('genPanel.motionVideo')))}
         {vmode === 'lipsync' && (speech ? slot(speech, t('genPanel.speechAudio'), () => setMeta({ speech: null })) : imagePicker('speech', t('genPanel.speechAudio')))}
-        {!video && (base ? slot(base.src, t('genPanel.baseImage'), () => setMeta({ base: null })) : imagePicker('base', t('genPanel.baseImage')))}
+        {!video && model.id !== CUSTOM_GENERATE && (base ? slot(base.src, t('genPanel.baseImage'), () => setMeta({ base: null })) : imagePicker('base', t('genPanel.baseImage')))}
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void upload(e.target.files).catch((err) => onError(String(err))); e.target.value = '' }} />
       </div>
       {video && (
@@ -277,7 +280,8 @@ export function GenPanel({ onError }: { onError: (msg: string) => void }) {
         <SettingsPill p={p} video={video} quality={!!model.steps} update={update} />
         <AdvancedPill shape={shape} model={model} setMeta={setMeta} />
         <div className="ca-gen__spacer" />
-        <ModelPill models={models} model={model} onPick={(id) => update({ workflow: id })} />
+        {lan && <RunOnPill runOn={validTarget(shape.meta.runOn)} onPick={(runOn) => setMeta({ runOn })} />}
+        <ModelPill models={models} model={model} runOn={runOnOf(shape)} onPick={(id) => update({ workflow: id })} />
         <button type="button" className="ca-gen__send" disabled={!ready} title={t('common.generate')} onClick={submit}>
           <span className="ca-icon">{Icons.send}</span>
         </button>

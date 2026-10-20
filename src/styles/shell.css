@@ -173,9 +173,7 @@ button.ca-head__logo:hover, button.ca-head__logo[data-open] { background: var(--
 .ca-composer__mini { width: 24px; height: 24px; border-radius: 4px; object-fit: cover; }
 .ca-composer__foot { gap: 4px; }
 .ca-composer__foot > .ca-pop-anchor { min-width: 0; }
-.ca-composer__foot .ca-gen__pill { max-width: 100%; min-width: 0; }
-.ca-composer__foot .ca-gen__pilltext { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ca-composer__foot .ca-gen__pill .ca-gen__chev { flex: none; }
+.ca-composer__foot .ca-gen__pill { max-width: 100%; }
 .ca-composer__mode { color: var(--ca-text); }
 .ca-composer__mode .ca-icon { width: 18px; height: 18px; }
 .ca-composer__mode .ca-icon:last-child { width: 14px; height: 14px; color: var(--ca-muted); }

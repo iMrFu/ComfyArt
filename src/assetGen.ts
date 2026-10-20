@@ -1,6 +1,6 @@
 import { createShapeId, type Editor, type TLImageShape, type TLShapeId } from 'tldraw'
 
-import { cloudMode, loadWorkflow } from './comfy'
+import { cloudMode, loadNamed, loadWorkflow } from './comfy'
 import { freeSpot, GAP, registerPlacer, selectResults, spawnHolder, startJob, type ErrorSink } from './jobs'
 import { AUDIO, AUDIO_SIZE, MODEL } from './shapes/EmbedShapes'
 import { GENERATOR } from './shapes/GeneratorShape'
@@ -25,29 +25,29 @@ export type AudioSpec =
 
 async function audioGraph(spec: AudioSpec): Promise<Built> {
   if (spec.kind === 'music') {
-    const g = await loadWorkflow('music-ace-step.api.json')
-    Object.assign(g['3'].inputs, { tags: spec.prompt, lyrics: spec.lyrics || '[instrumental]' })
-    g['5'].inputs.seconds = spec.seconds
-    g['6'].inputs.seed = randomSeed()
-    return { graph: g, result: '8' }
+    const { graph: g, id } = await loadNamed('music-ace-step.api.json', 'prompt', 'seconds', 'sampler', 'save')
+    Object.assign(g[id.prompt].inputs, { tags: spec.prompt, lyrics: spec.lyrics || '[instrumental]' })
+    g[id.seconds].inputs.seconds = spec.seconds
+    g[id.sampler].inputs.seed = randomSeed()
+    return { graph: g, result: id.save }
   }
   if (spec.kind === 'sfx') {
-    const g = await loadWorkflow('sfx-stable-audio.api.json')
-    g['3'].inputs.text = spec.prompt
-    g['5'].inputs.seconds = spec.seconds
-    g['6'].inputs.seed = randomSeed()
-    return { graph: g, result: '8' }
+    const { graph: g, id } = await loadNamed('sfx-stable-audio.api.json', 'prompt', 'seconds', 'sampler', 'save')
+    g[id.prompt].inputs.text = spec.prompt
+    g[id.seconds].inputs.seconds = spec.seconds
+    g[id.sampler].inputs.seed = randomSeed()
+    return { graph: g, result: id.save }
   }
   if (spec.kind === 'speech' && cloudMode()) {
-    const g = await loadWorkflow('speech-qwen3tts.api.json')
-    Object.assign(g['1'].inputs, { text: spec.text, speaker: spec.voice, seed: randomSeed() })
-    return { graph: g, result: '2' }
+    const { graph: g, id } = await loadNamed('speech-qwen3tts.api.json', 'prompt', 'save')
+    Object.assign(g[id.prompt].inputs, { text: spec.text, speaker: spec.voice, seed: randomSeed() })
+    return { graph: g, result: id.save }
   }
   if (spec.kind === 'speech') {
-    const g = await loadWorkflow('speech-kokoro.api.json')
-    g['1'].inputs.speaker_name = spec.voice
-    Object.assign(g['2'].inputs, { text: spec.text, lang: LANGS[spec.voice[0]] ?? 'English' })
-    return { graph: g, result: '3' }
+    const { graph: g, id } = await loadNamed('speech-kokoro.api.json', 'voice', 'prompt', 'save')
+    g[id.voice].inputs.speaker_name = spec.voice
+    Object.assign(g[id.prompt].inputs, { text: spec.text, lang: LANGS[spec.voice[0]] ?? 'English' })
+    return { graph: g, result: id.save }
   }
   if (spec.kind === 'voxcpm2') {
     const g = await loadWorkflow('speech-voxcpm2.api.json')
@@ -61,15 +61,15 @@ async function audioGraph(spec: AudioSpec): Promise<Built> {
     return { graph: g, result: '4' }
   }
   if (cloudMode()) {
-    const g = await loadWorkflow('voice-clone-qwen3tts.api.json')
-    g['1'].inputs.audio = annotated(spec.reference)
-    Object.assign(g['2'].inputs, { target_text: spec.text, seed: randomSeed() })
-    return { graph: g, result: '3' }
+    const { graph: g, id } = await loadNamed('voice-clone-qwen3tts.api.json', 'voice', 'prompt', 'save')
+    g[id.voice].inputs.audio = annotated(spec.reference)
+    Object.assign(g[id.prompt].inputs, { target_text: spec.text, seed: randomSeed() })
+    return { graph: g, result: id.save }
   }
-  const g = await loadWorkflow('voice-clone-indextts.api.json')
-  g['1'].inputs.audio = annotated(spec.reference)
-  Object.assign(g['3'].inputs, { text: spec.text, seed: randomSeed() })
-  return { graph: g, result: '4' }
+  const { graph: g, id } = await loadNamed('voice-clone-indextts.api.json', 'voice', 'prompt', 'save')
+  g[id.voice].inputs.audio = annotated(spec.reference)
+  Object.assign(g[id.prompt].inputs, { text: spec.text, seed: randomSeed() })
+  return { graph: g, result: id.save }
 }
 
 const LABELS: Record<AudioSpec['kind'], string> = { music: t('audio.music'), speech: t('audio.voiceover'), clone: t('audio.voiceover'), voxcpm2: t('audio.voxcpm2'), voxcpm2_clone: t('audio.voxcpm2Clone'), sfx: t('audio.soundEffect') }
@@ -86,9 +86,9 @@ export function generateAudio(editor: Editor, spec: AudioSpec, onError: ErrorSin
 }
 
 async function modelGraph(image: string): Promise<Built> {
-  const g = await loadWorkflow('image-to-3d-trellis2.api.json')
-  g['1'].inputs.image = image
-  return { graph: g, result: '30' }
+  const { graph: g, id } = await loadNamed('image-to-3d-trellis2.api.json', 'image', 'save')
+  g[id.image].inputs.image = image
+  return { graph: g, result: id.save }
 }
 
 export function imageTo3d(editor: Editor, shape: TLImageShape, onError: ErrorSink) {

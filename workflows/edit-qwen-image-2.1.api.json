@@ -49,6 +49,9 @@
         "11",
         0
       ]
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "7": {
@@ -76,6 +79,9 @@
         "6",
         2
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "8": {
@@ -89,6 +95,9 @@
         "4",
         0
       ]
+    },
+    "_meta": {
+      "title": "@decode"
     }
   },
   "9": {
@@ -99,12 +108,18 @@
         "8",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   },
   "11": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "example.png"
+    },
+    "_meta": {
+      "title": "@image"
     }
   }
 }

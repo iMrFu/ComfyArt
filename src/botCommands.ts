@@ -8,6 +8,7 @@ import { api, type ImageRef } from './comfy'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
+import { customWorkflowCommand } from './customWorkflows'
 import { DURATIONS, RATIOS, VIDEO_RATIOS } from './genOptions'
 import { MAX_VIDEO_REF_KINDS, VIDEO_TARGETS } from './videoGraphs'
 import { type ErrorSink, errorText, fileSrc, GAP, mediaAsset, placeMedia, type Media, resultsAtom } from './jobs'
@@ -217,6 +218,7 @@ const HANDLERS: Record<string, Handler> = {
     return args.bake ? { image: await bakeToImage(editor, editor.getShape<MockupShape>(shape.id as MockupShape['id'])!) } : { updated: shape.id }
   },
   image_to_3d: (editor, args, onError) => started(editor, imageTo3d(editor, imageOf(editor, args.id), onError)),
+  custom_workflow: (_editor, args) => customWorkflowCommand(args),
   wait_generation: (editor, args) => waitResults(editor, (args.ids ?? []).map(String), Number(args.timeout_s) || 60),
   concat_videos: async (editor, args, onError) => {
     const raw = Array.isArray(args.clips) ? args.clips : (Array.isArray(args.sources) ? args.sources : [])

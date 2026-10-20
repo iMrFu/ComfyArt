@@ -99,38 +99,38 @@ export function refHints(used: UsedRef[]): string[] {
   return used.map(({ mode }, i) => mode.hint.replace('{n}', String(i + 1))).filter(Boolean)
 }
 
-export function applyRefs(graph: PromptGraph, model: ModelDef, used: UsedRef[], strengths: Record<string, number>, controls: Record<string, RefControl>, width: number, height: number) {
+export function applyRefs(graph: PromptGraph, id: Record<string, string>, model: ModelDef, used: UsedRef[], strengths: Record<string, number>, controls: Record<string, RefControl>, width: number, height: number) {
   const images = used.map(({ src, mode }, i) => {
     graph[`r${i}`] = { class_type: 'LoadImage', inputs: { image: annotated(src) } }
-    if (!mode.node) return { id: `r${i}`, mode, src }
+    if (!mode.node) return { node: `r${i}`, mode, src }
     graph[`x${i}`] = preprocessNode(mode, [`r${i}`, 0], (controls[src] ?? DEFAULT_CONTROL).res)
-    return { id: `x${i}`, mode, src }
+    return { node: `x${i}`, mode, src }
   })
   if (model.refs === 'qwen' && images.length) {
-    graph['6'].inputs.vae = ['4', 0]
-    images.forEach(({ id }, i) => { graph['6'].inputs[`images.image_${i + 1}`] = [id, 0] })
+    graph[id.prompt].inputs.vae = [id.vae, 0]
+    images.forEach(({ node }, i) => { graph[id.prompt].inputs[`images.image_${i + 1}`] = [node, 0] })
   }
   if (model.refs === 'latent' && images.length) {
-    let [pos, neg]: [unknown, unknown] = [['6', 0], ['10', 0]]
-    images.forEach(({ id }, i) => {
-      graph[`s${i}`] = { class_type: 'ImageScaleToTotalPixels', inputs: { image: [id, 0], upscale_method: 'lanczos', megapixels: 1, resolution_steps: 1 } }
-      graph[`e${i}`] = { class_type: 'VAEEncode', inputs: { pixels: [`s${i}`, 0], vae: ['3', 0] } }
+    let [pos, neg]: [unknown, unknown] = [graph[id.guider].inputs.positive, graph[id.guider].inputs.negative]
+    images.forEach(({ node }, i) => {
+      graph[`s${i}`] = { class_type: 'ImageScaleToTotalPixels', inputs: { image: [node, 0], upscale_method: 'lanczos', megapixels: 1, resolution_steps: 1 } }
+      graph[`e${i}`] = { class_type: 'VAEEncode', inputs: { pixels: [`s${i}`, 0], vae: [id.vae, 0] } }
       graph[`p${i}`] = { class_type: 'ReferenceLatent', inputs: { conditioning: pos, latent: [`e${i}`, 0] } }
       graph[`n${i}`] = { class_type: 'ReferenceLatent', inputs: { conditioning: neg, latent: [`e${i}`, 0] } }
       ;[pos, neg] = [[`p${i}`, 0], [`n${i}`, 0]]
     })
-    Object.assign(graph['11'].inputs, { positive: pos, negative: neg })
+    Object.assign(graph[id.guider].inputs, { positive: pos, negative: neg })
   }
   const hints = images.filter(({ mode }) => mode.control)
   if (model.control && hints.length) {
     graph.cn = { class_type: 'ControlNetLoader', inputs: { control_net_name: model.control } }
-    let [pos, neg]: [unknown, unknown] = [graph['7'].inputs.positive, graph['7'].inputs.negative]
-    hints.forEach(({ id, src }, i) => {
+    let [pos, neg]: [unknown, unknown] = [graph[id.sampler].inputs.positive, graph[id.sampler].inputs.negative]
+    hints.forEach(({ node, src }, i) => {
       const c = controls[src] ?? DEFAULT_CONTROL
-      graph[`cs${i}`] = { class_type: 'ImageScale', inputs: { image: [id, 0], upscale_method: 'lanczos', width, height, crop: c.resize === 'crop' ? 'center' : 'disabled' } }
-      graph[`ca${i}`] = { class_type: 'ControlNetApplyAdvanced', inputs: { positive: pos, negative: neg, control_net: ['cn', 0], image: [`cs${i}`, 0], vae: [model.vae!, 0], strength: (strengths[src] ?? DEFAULT_STRENGTH) / 100, start_percent: c.start / 100, end_percent: c.end / 100 } }
+      graph[`cs${i}`] = { class_type: 'ImageScale', inputs: { image: [node, 0], upscale_method: 'lanczos', width, height, crop: c.resize === 'crop' ? 'center' : 'disabled' } }
+      graph[`ca${i}`] = { class_type: 'ControlNetApplyAdvanced', inputs: { positive: pos, negative: neg, control_net: ['cn', 0], image: [`cs${i}`, 0], vae: [id.vae, 0], strength: (strengths[src] ?? DEFAULT_STRENGTH) / 100, start_percent: c.start / 100, end_percent: c.end / 100 } }
       ;[pos, neg] = [[`ca${i}`, 0], [`ca${i}`, 1]]
     })
-    Object.assign(graph['7'].inputs, { positive: pos, negative: neg })
+    Object.assign(graph[id.sampler].inputs, { positive: pos, negative: neg })
   }
 }

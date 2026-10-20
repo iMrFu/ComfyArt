@@ -6,68 +6,117 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLERS = {"KSampler", "SamplerCustomAdvanced"}
-
-NODES_USED_BY_SRC = {
-    "cutout-birefnet.api.json": ["17", "18"],
-    "edit-qwen-image-2.1.api.json": ["6", "7", "8", "9", "11"],
-    "erase-lama.api.json": ["1", "2", "5", "6"],
-    "i2v-minimax-h3.api.json": ["92", "114", "105:10", "105:11", "105:14", "105:15", "105:16", "105:23", "105:24", "105:91", "105:104", "105:107", "105:111"],
-    "image-to-3d-trellis2.api.json": ["1", "30"],
-    "layers-qwen-image-layered.api.json": ["60", "74", "82", "83:3", "83:118", "116"],
-    "mockup-surface.api.json": ["1", "3", "7"],
-    "multiangle-qwen-image-2.1.api.json": ["6", "7", "9", "11"],
-    "music-ace-step.api.json": ["3", "5", "6", "8"],
-    "outpaint-qwen-image-2.1.api.json": ["7", "9", "11", "25"],
-    "qwen-image-2.1-t2i.api.json": ["3", "4"],
-    "r2v-minimax-h3.api.json": ["92", "129", "132", "136", "137"],
-    "sfx-stable-audio.api.json": ["3", "5", "6", "8"],
-    "speech-kokoro.api.json": ["1", "2", "3"],
-    "speech-qwen3tts.api.json": ["1", "2"],
-    "t2v-minimax-h3.api.json": ["92", "129", "131", "133"],
-    "transcribe-gemma4.api.json": ["2", "3"],
-    "upscale-ultrasharp-4x.api.json": ["1", "3", "4"],
-    "voice-clone-indextts.api.json": ["1", "3", "4"],
-    "voice-clone-qwen3tts.api.json": ["1", "2", "3"],
-}
+MODEL_FILE = "model.id"
 
 
 def _workflow(name: str) -> dict:
     return json.loads((ROOT / "workflows" / name).read_text(encoding="utf-8"))
 
 
+def _tags(node: dict) -> list[str]:
+    return [w for w in re.split(r"[\s,]+", node.get("_meta", {}).get("title", "").lower()) if w.startswith("@")]
+
+
+def _named(graph: dict, name: str) -> list[str]:
+    return [k for k, node in graph.items() if f"@{name.lower()}" in _tags(node)]
+
+
+def _args(src: str, start: int) -> list[str]:
+    depth, arg, args = 0, "", []
+    for c in src[start:]:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                return [*args, arg.strip()]
+            depth -= 1
+        if c == "," and depth == 0:
+            args.append(arg.strip())
+            arg = ""
+        else:
+            arg += c
+    raise AssertionError("unclosed loadNamed call")
+
+
+def _const(src: str, name: str) -> str:
+    found = re.search(rf"const {name} = (\[[^\]]*\]|'[^']*')", src)
+    assert found, name
+    return found.group(1)
+
+
+def _calls() -> list[tuple[str, str, list[str]]]:
+    calls = []
+    for path in sorted((ROOT / "src").rglob("*.ts*")):
+        src = path.read_text(encoding="utf-8")
+        for m in re.finditer(r"\bloadNamed\(", src):
+            file, *rest = _args(src, m.end())
+            if re.fullmatch(r"[A-Z_]+", file):
+                file = _const(src, file)
+            names = []
+            for arg in rest:
+                if arg.startswith("..."):
+                    names += re.findall(r"'([^']+)'", _const(src, arg[3:]) if re.fullmatch(r"[A-Z_]+", arg[3:]) else "")
+                else:
+                    names.append(arg.strip("'"))
+            calls.append((path.name, file.strip("'"), names))
+    return calls
+
+
 def _image_models() -> list[dict]:
     src = (ROOT / "src" / "models.ts").read_text(encoding="utf-8")
     block = src[src.index("export const IMAGE_MODELS"):src.index("export const VIDEO_MODELS")]
     models = []
-    for entry in re.findall(r"\{\s*id: '([^']+)'(.*?)\n  \}", block, re.S):
-        name, rest = entry
-        ids = re.findall(r"sizes: \[([^\]]*)\]", rest)
+    for name, rest in re.findall(r"\{\s*id: '([^']+)'(.*?)\n  \}", block, re.S):
+        sizes = re.findall(r"sizes: \[([^\]]*)\]", rest)
         models.append({
             "id": name,
-            "sizes": re.findall(r"'([^']+)'", ids[0]) if ids else [],
-            "vae": re.findall(r"vae: '([^']+)'", rest),
+            "sizes": re.findall(r"'([^']+)'", sizes[0]) if sizes else [],
             "steps": re.findall(r"steps: \['([^']+)'", rest),
-            "negative": re.findall(r"negative: \['([^']+)'", rest),
+            "negative": re.findall(r"negative: \['([^']+)', '([^']+)'\]", rest),
             "prompt": re.findall(r"prompt: '([^']+)'", rest),
+            "refs": re.findall(r"refs: '([^']+)'", rest),
         })
     return models
 
 
-def test_nodes_patched_by_the_frontend_exist():
-    for name, ids in NODES_USED_BY_SRC.items():
-        graph = _workflow(name)
-        assert [i for i in ids if i not in graph] == [], name
+def test_every_named_lookup_finds_one_node():
+    calls = _calls()
+    assert len(calls) > 20
+    assert [src for src, file, _ in calls if file == MODEL_FILE] == ["generate.ts"]
+    for src, file, names in calls:
+        if file == MODEL_FILE:
+            continue
+        graph = _workflow(file)
+        for name in names:
+            assert len(_named(graph, name)) == 1, (src, file, name)
+
+
+def test_workflow_titles_are_unique_and_name_the_output():
+    for path in sorted((ROOT / "workflows").glob("*.api.json")):
+        graph = json.loads(path.read_text(encoding="utf-8"))
+        tags = [t for node in graph.values() for t in _tags(node)]
+        assert len(tags) == len(set(tags)), path.name
+        assert "@save" in tags, path.name
 
 
 def test_image_model_workflows_follow_the_generator_layout():
     models = _image_models()
     assert len(models) >= 5
+    [shared] = [names for src, file, names in _calls() if file == MODEL_FILE]
     for m in models:
         graph = _workflow(m["id"])
-        for node in ["1", "5", "6", "7", "8", "9", *m["sizes"], *m["vae"], *m["steps"], *m["negative"]]:
-            assert node in graph, (m["id"], node)
-        assert graph["7"]["class_type"] in SAMPLERS, m["id"]
-        assert "latent_image" in graph["7"]["inputs"], m["id"]
-        assert "batch_size" in graph["5"]["inputs"], m["id"]
-        assert graph["9"]["class_type"].startswith("Save"), m["id"]
-        assert m["prompt"][0] in graph["6"]["inputs"], m["id"]
+        names = [*shared, *m["sizes"], *m["steps"], *(n for n, _ in m["negative"]), *(["guider"] if m["refs"] == ["latent"] else [])]
+        for name in names:
+            assert len(_named(graph, name)) == 1, (m["id"], name)
+        node = {name: graph[_named(graph, name)[0]] for name in names}
+        assert node["sampler"]["class_type"] in SAMPLERS, m["id"]
+        assert "latent_image" in node["sampler"]["inputs"], m["id"]
+        assert "batch_size" in node["size"]["inputs"], m["id"]
+        assert node["save"]["class_type"].startswith("Save"), m["id"]
+        assert m["prompt"][0] in node["prompt"]["inputs"], m["id"]
+        for name in m["sizes"]:
+            assert {"width", "height"} <= set(node[name]["inputs"]), (m["id"], name)
+        for name in m["steps"]:
+            assert "steps" in node[name]["inputs"], (m["id"], name)
+        for name, key in m["negative"]:
+            assert key in node[name]["inputs"], (m["id"], name)

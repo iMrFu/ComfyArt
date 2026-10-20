@@ -1,13 +1,13 @@
 import { createShapeId, type Editor, type TLImageShape } from 'tldraw'
 
-import { loadWorkflow, promptHistory, uploadImage, viewUrl, type ImageRef } from './comfy'
+import { loadNamed, promptHistory, uploadImage, viewUrl, type ImageRef } from './comfy'
 import { GAP, placeMedia, registerPlacer, selectResults, spawnHolder, startJob, toMedia, type ErrorSink } from './jobs'
 import { bakeMockup } from './mockupGl'
 import { MOCKUP, placementOf, sourcesOf, type MockupShape } from './shapes/MockupShape'
 import { annotated, editGraph } from './workflows'
 import { t } from './i18n'
 
-const [DEPTH, MASK] = ['3', '7']
+const SURFACE = 'mockup-surface.api.json'
 const BLEND_PROMPT = 'Make the printed design look naturally printed on the product: follow its folds, curvature, fabric or material texture and lighting. Keep the design content and position, the product and the background unchanged.'
 
 export function createMockup(editor: Editor, shape: TLImageShape, onError: ErrorSink) {
@@ -16,16 +16,16 @@ export function createMockup(editor: Editor, shape: TLImageShape, onError: Error
   const { src, name } = asset.props
   const holder = spawnHolder(editor, shape)
   void startJob(editor, holder, (async () => {
-    const g = await loadWorkflow('mockup-surface.api.json')
-    g['1'].inputs.image = annotated(src)
-    return { graph: g, result: DEPTH }
+    const { graph: g, id } = await loadNamed(SURFACE, 'image', 'save')
+    g[id.image].inputs.image = annotated(src)
+    return { graph: g, result: id.save }
   })(), { name: t('mockup.name', name), placer: 'mockup', extra: { photo: src } }, onError)
   return holder
 }
 
 registerPlacer('mockup', async (editor, holder, [depth], job) => {
-  const hist = await promptHistory(job.id)
-  const mask = hist?.outputs?.[MASK]?.images?.[0] as ImageRef | undefined
+  const [hist, surface] = await Promise.all([promptHistory(job.id), loadNamed(SURFACE, 'saveMask')])
+  const mask = hist?.outputs?.[surface.id.saveMask]?.images?.[0] as ImageRef | undefined
   if (!mask) throw new Error('mockup surface has no mask')
   const { w, h } = holder.props as { w: number; h: number }
   const id = createShapeId()

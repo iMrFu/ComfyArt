@@ -4,6 +4,9 @@
     "inputs": {
       "unet_name": "z_image_turbo_bf16.safetensors",
       "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "@unet"
     }
   },
   "2": {
@@ -18,6 +21,9 @@
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "ae.safetensors"
+    },
+    "_meta": {
+      "title": "@vae"
     }
   },
   "4": {
@@ -36,6 +42,9 @@
       "width": 1024,
       "height": 1024,
       "batch_size": 1
+    },
+    "_meta": {
+      "title": "@size"
     }
   },
   "6": {
@@ -46,6 +55,9 @@
         "2",
         0
       ]
+    },
+    "_meta": {
+      "title": "@prompt"
     }
   },
   "10": {
@@ -82,6 +94,9 @@
         "5",
         0
       ]
+    },
+    "_meta": {
+      "title": "@sampler"
     }
   },
   "8": {
@@ -95,6 +110,9 @@
         "3",
         0
       ]
+    },
+    "_meta": {
+      "title": "@decode"
     }
   },
   "9": {
@@ -105,6 +123,9 @@
         "8",
         0
       ]
+    },
+    "_meta": {
+      "title": "@save"
     }
   }
 }

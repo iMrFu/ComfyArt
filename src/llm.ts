@@ -1,6 +1,6 @@
 import { atom } from 'tldraw'
 
-import { api, loadWorkflow, queuePrompt, uploadImage, viewUrl, waitForText } from './comfy'
+import { api, loadNamed, queuePrompt, uploadImage, viewUrl, waitForText } from './comfy'
 import { t } from './i18n'
 import { botEnabledAtom, settingsAtom } from './bot'
 import { annotated } from './workflows'
@@ -48,14 +48,14 @@ export async function transcribe(audio: Blob): Promise<string> {
 }
 
 export async function transcribeFile(src: string): Promise<string> {
-  const g = await loadWorkflow('transcribe-gemma4.api.json')
+  const { graph: g, id } = await loadNamed('transcribe-gemma4.api.json', 'prompt', 'save')
   g.a = { class_type: 'LoadAudio', inputs: { audio: annotated(src) } }
-  Object.assign(g['2'].inputs, {
+  Object.assign(g[id.prompt].inputs, {
     audio: ['a', 0],
     prompt: 'Transcribe the speech exactly. Output only the transcript. Write Chinese in simplified characters.',
     system_prompt: 'You are a speech recognition engine.',
   })
-  return stripThink(await waitForText(await queuePrompt(g), '3'))
+  return stripThink(await waitForText(await queuePrompt(g), id.save))
 }
 
 const OCR_PROMPT = 'List every piece of text visible in this image exactly as written, one text block per line, from top to bottom. Output only the text lines, nothing else.'
@@ -71,9 +71,9 @@ function setStatus(src: string, status: OcrStatus | null) {
 }
 
 async function localOcr(src: string): Promise<string> {
-  const g = await loadWorkflow('transcribe-gemma4.api.json')
+  const { graph: g, id: node } = await loadNamed('transcribe-gemma4.api.json', 'prompt', 'save')
   g.i = { class_type: 'LoadImage', inputs: { image: annotated(src) } }
-  Object.assign(g['2'].inputs, { image: ['i', 0], prompt: OCR_PROMPT, system_prompt: OCR_SYSTEM })
+  Object.assign(g[node.prompt].inputs, { image: ['i', 0], prompt: OCR_PROMPT, system_prompt: OCR_SYSTEM })
   const id = await queuePrompt(g)
   setStatus(src, { stage: 'queued', tokens: 0 })
   const stops = [
@@ -87,7 +87,7 @@ async function localOcr(src: string): Promise<string> {
   try {
     const queue = await (await api('/queue')).json()
     if (queue.queue_running?.some((job: unknown[]) => job[1] === id) && ocrStatusAtom.get()[src]?.stage === 'queued') setStatus(src, { stage: 'loading', tokens: 0 })
-    return await waitForText(id, '3')
+    return await waitForText(id, node.save)
   } finally {
     stops.forEach((stop) => stop())
   }

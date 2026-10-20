@@ -55,7 +55,8 @@
                   "index",
                   "guides/getting-started",
                   "guides/home",
-                  "guides/models"
+                  "guides/models",
+                  "guides/lan-instances"
                 ]
               },
               {
@@ -75,7 +76,8 @@
                 "pages": [
                   "guides/assets",
                   "guides/agent",
-                  "guides/mcp"
+                  "guides/mcp",
+                  "guides/custom-workflows"
                 ]
               }
             ]
@@ -94,7 +96,8 @@
                   "zh/index",
                   "zh/guides/getting-started",
                   "zh/guides/home",
-                  "zh/guides/models"
+                  "zh/guides/models",
+                  "zh/guides/lan-instances"
                 ]
               },
               {
@@ -114,7 +117,8 @@
                 "pages": [
                   "zh/guides/assets",
                   "zh/guides/agent",
-                  "zh/guides/mcp"
+                  "zh/guides/mcp",
+                  "zh/guides/custom-workflows"
                 ]
               }
             ]
