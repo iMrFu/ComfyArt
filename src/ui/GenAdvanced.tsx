@@ -19,15 +19,17 @@ export function AdvancedPill({ shape, model, setMeta }: { shape: GeneratorShape;
   const [query, setQuery] = useState('')
   const all = useValue(lorasAtom)
   const favorites = useValue(loraFavoritesAtom)
-  useEffect(() => { if (open && model.lora) void loadLoras() }, [open, model.lora])
+  const hasLora = model.lora !== undefined
+  const current = tab === 'model' && !model.lora ? 'all' : tab
+  useEffect(() => { if (open && hasLora) void loadLoras() }, [open, hasLora])
 
   const seed = seedOf(shape)
   const negative = negativeOf(shape)
   const loras = lorasOf(shape)
-  const count = (seed != null ? 1 : 0) + (negative ? 1 : 0) + (model.lora ? loras.length : 0)
+  const count = (seed != null ? 1 : 0) + (negative ? 1 : 0) + (hasLora ? loras.length : 0)
   const needle = query.trim().toLowerCase()
   const listed = (all ?? [])
-    .filter((l) => (tab === 'model' ? l.family === model.lora : tab === 'favorites' ? favorites.includes(l.name) : true))
+    .filter((l) => (current === 'model' ? l.family === model.lora : tab === 'favorites' ? favorites.includes(l.name) : true))
     .filter((l) => !needle || l.name.toLowerCase().includes(needle))
     .filter((l) => !loras.some((p) => p.name === l.name))
 
@@ -54,7 +56,7 @@ export function AdvancedPill({ shape, model, setMeta }: { shape: GeneratorShape;
             <textarea className="ca-adv__negative" value={negative} placeholder={t('genAdvanced.negativeHint')} onChange={(e) => setMeta({ negative: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
           </>
         )}
-        {model.lora && (
+        {hasLora && (
           <>
             <div className="ca-gen__label">LoRA</div>
             {loras.map((l) => (
@@ -71,20 +73,20 @@ export function AdvancedPill({ shape, model, setMeta }: { shape: GeneratorShape;
             {adding && (
               <div className="ca-adv__picker">
                 <div className="ca-gen__chips">
-                  {([['model', t('genAdvanced.forThisModel')], ['favorites', t('genAdvanced.favorites')], ['all', t('common.all')]] as [Tab, string][]).map(([k, label]) => (
-                    <button key={k} type="button" className="ca-gen__chip" data-on={tab === k || undefined} onClick={() => setTab(k)}>{label}</button>
+                  {([['model', t('genAdvanced.forThisModel')], ['favorites', t('genAdvanced.favorites')], ['all', t('common.all')]] as [Tab, string][]).filter(([k]) => k !== 'model' || model.lora).map(([k, label]) => (
+                    <button key={k} type="button" className="ca-gen__chip" data-on={current === k || undefined} onClick={() => setTab(k)}>{label}</button>
                   ))}
                 </div>
                 <input className="ca-assets__search" value={query} placeholder={t('assetPicker.search')} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
                 <div className="ca-adv__list">
                   {all === null && <div className="ca-compose__empty">{t('assetPicker.loading')}</div>}
-                  {all !== null && !listed.length && <div className="ca-compose__empty">{tab === 'model' ? t('genAdvanced.noLorasForModel') : t('genAdvanced.noLoras')}</div>}
+                  {all !== null && !listed.length && <div className="ca-compose__empty">{current === 'model' ? t('genAdvanced.noLorasForModel') : t('genAdvanced.noLoras')}</div>}
                   {listed.map((l) => (
                     <div key={l.name} className="ca-adv__row">
                       <button type="button" className="ca-adv__star" data-on={favorites.includes(l.name) || undefined} title={t('genAdvanced.favorite')} onClick={() => void toggleFavorite(l.name)}>★</button>
                       <button type="button" className="ca-menu__item ca-adv__pick" title={l.name} onClick={() => { setMeta({ loras: [...loras, { name: l.name, strength: DEFAULT_LORA_STRENGTH }] }); setAdding(false) }}>
                         <span className="ca-menu__grow">{loraLabel(l.name)}</span>
-                        {l.family !== model.lora && <span className="ca-model__tag">{l.family ? t('genAdvanced.otherModel') : t('genAdvanced.unknownModel')}</span>}
+                        {model.lora && l.family !== model.lora && <span className="ca-model__tag">{l.family ? t('genAdvanced.otherModel') : t('genAdvanced.unknownModel')}</span>}
                       </button>
                     </div>
                   ))}

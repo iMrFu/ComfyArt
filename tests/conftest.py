@@ -60,6 +60,11 @@ def _install_stubs() -> None:
                 raise KeyError("Unknown user: " + user)
             return user
 
+        def get_request_user_filepath(self, request, file, create_dir=True):
+            root = os.path.join(user_dir(), self.get_request_user_id(request))
+            path = os.path.abspath(os.path.join(root, file))
+            return path if os.path.commonpath((root, path)) == root else None
+
     class _Queue:
         def get_tasks_remaining(self):
             return 0

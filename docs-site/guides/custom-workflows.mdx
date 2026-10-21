@@ -30,6 +30,7 @@ In ComfyUI right-click a node → **Title** and add a marker:
 | `@width`, `@height` | Int | width and height, when they are separate |
 | `@count` | Int, or a node with `batch_size` / `amount` | how many results |
 | `@seconds` | Int / Float, or a node with `seconds` / `duration` | video length in **seconds** |
+| `@unet` | Load Diffusion Model, Load Checkpoint... (first output is the MODEL) | the LoRAs picked under **Advanced**, chained after it |
 | `@save` | Save Image, Save Video, Preview Image... | the result. Needed only when the workflow has several end nodes |
 
 Titles are case-insensitive and other words are ignored, so `Positive @prompt` works. A node that receives several values takes several markers: `@prompt @size`. Each marker goes on one node only.
@@ -52,7 +53,7 @@ Open the project menu (top-left icon) → **Custom workflows**. Features are gro
 
 | Feature | Required | Optional | Notes |
 |---|---|---|---|
-| Text to image | `@prompt`, `@size` (or `@width` + `@height`) | `@count` | Appears as an extra model in the generator. Reference and base images are not passed. |
+| Text to image | `@prompt`, `@size` (or `@width` + `@height`) | `@count`, `@unet` | Appears as an extra model in the generator. Reference and base images are not passed. LoRAs need `@unet`. |
 | Quick edit / edit text | `@image`, `@prompt` | | Also used by compose and mockup blending. |
 | Style transfer | `@image`, `@prompt` | `@image2` | Without a reference, `@image2` gets the same image. |
 | Inpaint / edit region | `@image`, `@prompt` | | ComfyArt crops the region for your workflow and pastes the result back. The result node needs an `images` input. |

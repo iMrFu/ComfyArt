@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { useActions, useEditor, useValue, type Editor, type TLShape } from 'tldraw'
+import { useActions, useEditor, useValue, type Editor, type TLImageShape, type TLShape } from 'tldraw'
+
+import { MAX_VIEWS, viewsTo3d } from '../assetGen'
 
 import { booleanOp, type BoolOp } from '../booleans'
 import { openCanvasChat } from '../canvasChat'
@@ -73,6 +75,10 @@ export function MultiToolbar({ onError }: { onError: (msg: string) => void }) {
   const act = (fn: () => unknown) => () => { setMenu(null); Promise.resolve(fn()).catch((e) => onError(errorText(e))) }
   const name = (editor.getDocumentSettings().name || 'comfyart').replace(/[\\/:*?"<>|]/g, '_')
 
+  const views = shapes.length <= MAX_VIEWS && shapes.every((s) => s.type === 'image')
+    ? [...shapes as TLImageShape[]].sort((a, b) => editor.getShapePageBounds(a)!.x - editor.getShapePageBounds(b)!.x)
+    : null
+
   const downloadAll = async () => {
     for (const s of shapes) {
       const asset = mediaAsset(editor, s)
@@ -90,6 +96,7 @@ export function MultiToolbar({ onError }: { onError: (msg: string) => void }) {
       <Btn icon={Icons.grid} label={t('multiToolbar.tidyUp')} onClick={() => arrange(editor, shapes)} />
       <Btn icon={Icons.box} label={t('canvasMenu.group')} onClick={() => editor.groupShapes(ids)} />
       <Btn icon={Icons.merge} label={t('canvasMenu.mergeLayers')} onClick={() => actions['flatten-to-image']?.onSelect('toolbar')} />
+      {views && <Btn icon={Icons.cube} label={t('imageToolbar.multiViewTo3d')} title={t('imageToolbar.multiViewTo3dHint')} onClick={() => viewsTo3d(editor, views, onError)} />}
       {shapes.every((s) => s.type === VECTOR) && (
         <Popover open={menu === 'boolean'} onOpenChange={pick('boolean')} trigger={({ open, toggle }) => <Btn icon={Icons.unite} title={t('multiToolbar.boolean')} open={open} onClick={toggle} />}>
           <div className="ca-menu ca-iconmenu">

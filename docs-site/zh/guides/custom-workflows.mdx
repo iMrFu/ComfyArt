@@ -30,6 +30,7 @@ ComfyArt 靠**节点标题**找到要填的节点：给接收图片、提示词�
 | `@width`、`@height` | Int | 宽和高分开时用 |
 | `@count` | Int，或带 `batch_size` / `amount` 的节点 | 生成几个 |
 | `@seconds` | Int / Float，或带 `seconds` / `duration` 的节点 | 视频时长，单位是**秒** |
+| `@unet` | Load Diffusion Model、Load Checkpoint 等（第一个输出是 MODEL） | **高级**里选的 LoRA，串在它后面 |
 | `@save` | Save Image、Save Video、Preview Image 等 | 结果节点。只有工作流有多个末端节点时才需要 |
 
 标题不区分大小写，其他文字会被忽略，所以 `Positive @prompt` 也行。一个节点要接收多个值时可以写多个标记：`@prompt @size`。每个标记只能标一个节点。
@@ -52,7 +53,7 @@ ComfyArt 自带的工作流（`custom_nodes/ComfyArt/workflows/`）也是这样�
 
 | 功能 | 必需 | 可选 | 说明 |
 |---|---|---|---|
-| 文生图 | `@prompt`、`@size`（或 `@width` + `@height`） | `@count` | 作为一个新模型出现在生成器里。参考图和底图不会传入。 |
+| 文生图 | `@prompt`、`@size`（或 `@width` + `@height`） | `@count`、`@unet` | 作为一个新模型出现在生成器里。参考图和底图不会传入。用 LoRA 需要 `@unet`。 |
 | 快捷编辑 / 编辑文字 | `@image`、`@prompt` | | 合成和样机融合也会用它。 |
 | 风格迁移 | `@image`、`@prompt` | `@image2` | 没有参考图时，`@image2` 填同一张图。 |
 | 局部重绘 / 点选修改 | `@image`、`@prompt` | | ComfyArt 先裁出选区交给你的工作流，再把结果贴回原图。结果节点需要有 `images` 输入。 |

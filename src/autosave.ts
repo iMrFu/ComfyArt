@@ -16,9 +16,11 @@ export const saveNow = () => flushCurrent?.() ?? Promise.resolve()
 
 export function startAutosave(editor: Editor, id: string, canSave: () => boolean, onSaved: () => void) {
   let timer = 0
+  let changed = 0
   let running: Promise<void> | null = null
   const save = async () => {
     clearTimeout(timer)
+    timer = 0
     if (!canSave()) return
     while (running) await running
     saveStateAtom.set({ state: 'saving' })
@@ -32,10 +34,15 @@ export function startAutosave(editor: Editor, id: string, canSave: () => boolean
       .finally(() => { running = null })
     await running
   }
+  const due = () => {
+    const wait = changed + SAVE_DELAY - Date.now()
+    if (wait > 0) timer = window.setTimeout(due, wait)
+    else void save()
+  }
   const stop = editor.store.listen(() => {
-    clearTimeout(timer)
-    saveStateAtom.set({ state: 'pending' })
-    timer = window.setTimeout(() => void save(), SAVE_DELAY)
+    changed = Date.now()
+    if (saveStateAtom.get().state !== 'pending') saveStateAtom.set({ state: 'pending' })
+    if (!timer) timer = window.setTimeout(due, SAVE_DELAY)
   }, { scope: 'document' })
   const warn = (e: BeforeUnloadEvent) => {
     if (saveStateAtom.get().state !== 'saved' && canSave()) e.preventDefault()

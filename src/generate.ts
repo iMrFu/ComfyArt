@@ -153,7 +153,14 @@ async function generateGraph(shape: GeneratorShape): Promise<Built> {
   }
   const [width, height] = targetSize(shape.props)
   if (model?.id === CUSTOM_GENERATE) {
-    const custom = await customGraph('generate', { prompt, width, height, count }, transparent ? withAlpha : undefined)
+    const loras = lorasOf(shape)
+    const custom = await customGraph('generate', { prompt, width, height, count }, (graph, markers, result) => {
+      if (loras.length) {
+        if (!markers.unet) throw new Error(t('customWorkflows.needsUnet', model.label))
+        applyLoras(graph, markers.unet, loras)
+      }
+      if (transparent) withAlpha(graph, markers, result)
+    })
     if (!custom) throw new Error(t('customWorkflows.generateGone', model.label))
     return custom
   }

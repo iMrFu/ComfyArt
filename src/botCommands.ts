@@ -1,7 +1,7 @@
 import { react, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
 import * as actions from './actions'
-import { generateAudio, imageTo3d, voices } from './assetGen'
+import { generateAudio, imageTo3d, viewsTo3d, voices } from './assetGen'
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
 import { api, type ImageRef } from './comfy'
@@ -217,7 +217,9 @@ const HANDLERS: Record<string, Handler> = {
     })
     return args.bake ? { image: await bakeToImage(editor, editor.getShape<MockupShape>(shape.id as MockupShape['id'])!) } : { updated: shape.id }
   },
-  image_to_3d: (editor, args, onError) => started(editor, imageTo3d(editor, imageOf(editor, args.id), onError)),
+  image_to_3d: (editor, args, onError) => started(editor, Array.isArray(args.views) && args.views.length
+    ? viewsTo3d(editor, args.views.map((v: unknown) => imageOf(editor, v)), onError)
+    : imageTo3d(editor, imageOf(editor, args.id), onError, args.model === 'pixal3d' ? 'pixal3d' : 'trellis2')),
   custom_workflow: (_editor, args) => customWorkflowCommand(args),
   wait_generation: (editor, args) => waitResults(editor, (args.ids ?? []).map(String), Number(args.timeout_s) || 60),
   concat_videos: async (editor, args, onError) => {

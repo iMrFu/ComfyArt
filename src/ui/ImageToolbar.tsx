@@ -200,7 +200,14 @@ export function ImageToolbar({ onError }: { onError: (msg: string) => void }) {
     { id: 'vectorize', icon: Icons.polygon, label: t('imageToolbar.vectorize'), run: () => void vectorize(editor, shape).catch((e) => onError(String(e))) },
     { id: 'elements', icon: Icons.textTool, label: t('imageToolbar.editElements'), run: () => editElements(editor, shape, onError) },
     { id: 'mockup', icon: Icons.box, label: t('mockup.title'), run: () => createMockup(editor, shape, onError) },
-    { id: 'to3d', icon: Icons.cube, label: t('imageToolbar.imageTo3d'), run: () => imageTo3d(editor, shape, onError) },
+    {
+      id: 'to3d', icon: Icons.cube, label: t('imageToolbar.imageTo3d'), menu: (
+        <div className="ca-menu">
+          <Item icon={Icons.cube} label="TRELLIS.2" onClick={close(() => imageTo3d(editor, shape, onError, 'trellis2'))} />
+          <Item icon={Icons.cube} label="Pixal3D" onClick={close(() => imageTo3d(editor, shape, onError, 'pixal3d'))} />
+        </div>
+      ),
+    },
     { id: 'transform', icon: Icons.rotate, label: t('imageToolbar.flipAndRotate'), menu: <TransformMenu editor={editor} shape={shape} /> },
     { id: 'regenerate', icon: Icons.replace, label: t('common.regenerate'), run: () => void regenerate(editor, shape, onError), when: !!genInfo?.prompt },
     { id: 'remix', icon: Icons.genImage, label: t('imageToolbar.remix'), run: () => remix(editor, shape), when: !!genInfo?.prompt },

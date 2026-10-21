@@ -2,14 +2,14 @@ import { titleTags, type PromptGraph } from './comfy'
 import { t } from './i18n'
 
 export type CustomAction = 'generate' | 'edit' | 'style' | 'inpaint' | 'expand' | 'upscale' | 'cutout' | 'erase' | 'angles' | 'layers' | 'video' | 'animate'
-export type Marker = 'image' | 'image2' | 'mask' | 'last' | 'prompt' | 'size' | 'width' | 'height' | 'count' | 'seconds' | 'save'
+export type Marker = 'image' | 'image2' | 'mask' | 'last' | 'prompt' | 'size' | 'width' | 'height' | 'count' | 'seconds' | 'unet' | 'save'
 
 export type CustomGroup = 'image' | 'edit' | 'tools' | 'video'
 
 interface ActionSpec { id: CustomAction; group: CustomGroup; required: Marker[]; optional: Marker[]; needsImages?: boolean; note: string }
 
 export const CUSTOM_ACTIONS: ActionSpec[] = [
-  { id: 'generate', group: 'image', required: ['prompt', 'size'], optional: ['count'], note: 'Text to image. Shows up as an extra model in the image generator. Reference and base images are not passed. Transparent output is added by ComfyArt after @save, so @save needs an images input.' },
+  { id: 'generate', group: 'image', required: ['prompt', 'size'], optional: ['count', 'unet'], note: 'Text to image. Shows up as an extra model in the image generator. Reference and base images are not passed. Transparent output is added by ComfyArt after @save, so @save needs an images input. LoRAs picked under Advanced need @unet.' },
   { id: 'edit', group: 'edit', required: ['image', 'prompt'], optional: [], note: 'Instruction edit: quick edit, edit text, compose and mockup blending. @prompt receives the edit instruction.' },
   { id: 'style', group: 'edit', required: ['image', 'prompt'], optional: ['image2'], note: 'Style transfer. @image2 is the style reference; without one ComfyArt passes the source image again. A reference given to a workflow with no @image2 is an error.' },
   { id: 'inpaint', group: 'edit', required: ['image', 'prompt'], optional: [], needsImages: true, note: 'Edit a region. @image receives the cropped region; ComfyArt pastes the result back into the full image, so @save needs an images input.' },
@@ -34,6 +34,7 @@ export const MARKERS: { id: Marker; fill: string }[] = [
   { id: 'height', fill: 'an Int node or any node with a height widget' },
   { id: 'count', fill: 'an Int node or a node with batch_size / amount: how many results' },
   { id: 'seconds', fill: 'an Int or Float node or a node with seconds / duration: video length in seconds (not frames)' },
+  { id: 'unet', fill: 'the node whose first output is the MODEL, e.g. Load Diffusion Model or Load Checkpoint: LoRAs picked under Advanced are chained after it' },
   { id: 'save', fill: 'the output node (Save Image, Save Video, Preview Image...). Needed only when the workflow has more than one end node' },
 ]
 
@@ -101,7 +102,7 @@ function fillProblem(graph: PromptGraph, id: string, marker: Marker): string | n
   if (IMAGE_MARKERS.includes(marker)) return LOADERS.includes(node.class_type) ? null : t('customWorkflows.needsLoader', `@${marker}`, label(graph, id))
   if (marker === 'prompt') return textKey(node) ? null : t('customWorkflows.noTextWidget', label(graph, id))
   if (marker === 'size') return ['width', 'height'].every((k) => typeof node.inputs[k] === 'number') ? null : t('customWorkflows.noSizeWidgets', label(graph, id))
-  if (marker === 'save') return null
+  if (marker === 'save' || marker === 'unet') return null
   return numberKey(node, marker) ? null : t('customWorkflows.noNumberWidget', `@${marker}`, label(graph, id))
 }
 
@@ -141,7 +142,7 @@ export interface CustomValues { image?: string; image2?: string; mask?: string; 
 
 export function fillWorkflow(graph: PromptGraph, markers: Markers, values: CustomValues) {
   for (const [marker, id] of Object.entries(markers) as [Marker, string][]) {
-    const value = marker === 'size' || marker === 'save' ? undefined : values[marker]
+    const value = marker === 'size' || marker === 'save' || marker === 'unet' ? undefined : values[marker]
     if (value === undefined) continue
     const node = graph[id]
     if (IMAGE_MARKERS.includes(marker)) {
@@ -167,6 +168,6 @@ export function rulesText(): string {
     'Steps:\n1. The workflow must be API format (Workflow > Export (API) in ComfyUI): an object of node id -> {class_type, inputs, _meta}. A UI-format file (with "nodes" and "links") cannot be used; ask the user to export it as API.\n2. Pick the feature (action) and set _meta.title of the nodes listed for it below. Titles are case-insensitive. Each marker goes on exactly one node; a node that receives several values carries several markers separated by spaces, e.g. "@prompt @size". Other words in the title are ignored, so "Positive @prompt" works. Only change _meta.title and, when a value has no node to receive it, add the smallest node that can (for example a PrimitiveInt for @seconds feeding a frame-count input through a math node). Do not change the user\'s models or settings.\n3. Call custom_workflow with action check, the workflow and the feature; fix every error it reports.\n4. Call custom_workflow with action install, a short name, the workflow and the feature. It saves the file to comfyart/workflows/<feature>/ in the ComfyUI user folder and assigns it to that feature. There is no delete: to remove a workflow, the user deletes its file there.\n5. Tell the user which feature now uses it; assign with file "" switches back to built in.',
     `Markers (the node title is @ plus the name):\n${markers}`,
     `Features:\n${actions}`,
-    'ComfyArt randomizes every seed and noise_seed input on each run and maps model file names to the subfolder they are in, so seeds and model paths need no marker. The workflows ComfyArt ships (custom_nodes/ComfyArt/workflows/*.api.json) carry the same titles and are good examples; other @ names in them are internal and ignored for custom workflows. Features not listed above (storyboard, video extend, creative upscale, move object, video upscale) always use the built-in workflows.',
+    'ComfyArt randomizes every seed and noise_seed input on each run and maps model file names to the subfolder they are in, so seeds and model paths need no marker. The workflows ComfyArt ships (custom_nodes/ComfyArt/workflows/*.api.json) carry the same titles and are good examples; other @ names in them (besides @unet) are internal and ignored for custom workflows. Features not listed above (storyboard, video extend, creative upscale, move object, video upscale) always use the built-in workflows.',
   ].join('\n\n')
 }

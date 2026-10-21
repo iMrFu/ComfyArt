@@ -34,8 +34,8 @@ export function api(path: string, init?: RequestInit) {
 const userFile = (path: string) => `/userdata/${encodeURIComponent(path)}`
 
 export async function readUserText(path: string): Promise<string | null> {
-  const res = await api(userFile(path))
-  if (res.status === 404) return null
+  const res = await api(`/comfyart${userFile(path)}`)
+  if (res.status === 204) return null
   if (!res.ok) throw new Error(`read ${path} failed: ${res.status}`)
   return res.text()
 }
@@ -71,6 +71,12 @@ export function viewUrl(ref: ImageRef): string {
 export function thumbUrl(src: string, max = 256): string {
   return `/comfyart/thumb?${new URLSearchParams({ url: src, max: String(max) })}`
 }
+
+const THUMB_SIZES = [256, 512, 1024]
+
+export const thumbSize = (edge: number) => THUMB_SIZES.find((s) => edge <= s)
+
+export const isViewUrl = (src: string) => src.startsWith('/api/view?')
 
 export function refFromUrl(src: string): ImageRef {
   const q = new URL(src, location.origin).searchParams

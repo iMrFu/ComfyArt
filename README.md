@@ -73,7 +73,7 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 | Action | Workflow | Models / custom nodes |
 |---|---|---|
 | Image generation, quick edit, edit text, expand, comment edits | `qwen-image-2.1-t2i`, `edit-qwen-image-2.1`, `outpaint-qwen-image-2.1` | `qwen_image_2.1_int8_convrot.safetensors`, `qwen3vl_8b_int8_convrot.safetensors`, `qwen_image_2.1_vae_bf16.safetensors` |
-| Image generation (other models) | `z-image-turbo-t2i`, `flux2-klein-9b-t2i`, `qwen-image-2512-t2i`, `ideogram4-t2i` | `z_image_turbo_bf16` + `qwen_3_4b` + `ae`; `flux-2-klein-9b-nvfp4` + `qwen_3_8b_fp8mixed` + `flux2-vae`; `qwen_image_2512_fp8_e4m3fn` + `qwen_2.5_vl_7b_fp8_scaled` + `qwen_image_vae` (loaded with the ComfyArt Precise UNET Loader node, see below); `ideogram4_fp8_scaled` + `ideogram4_unconditional_fp8_scaled` + `qwen3vl_8b_fp8_scaled` + `flux2-vae`; the default Agent writes the structured caption Ideogram expects (`ideogram4-caption.json`) |
+| Image generation (other models) | `z-image-turbo-t2i`, `flux2-klein-9b-t2i`, `flux3-klein-t2i`, `moss-image-t2i`, `qwen-image-2512-t2i`, `ideogram4-t2i` | `z_image_turbo_bf16` + `qwen_3_4b` + `ae`; `flux-2-klein-9b-nvfp4` + `qwen_3_8b_fp8mixed` + `flux2-vae`; `flux3-image-klein-int8-convrot` + `qwen3vl_4b_int8_convrot` + `flux2-vae`; `moss_image_sft_int8_convrot` + `qwen3.5_9b_w4a8_gptq` + `flux2-vae_small`; `qwen_image_2512_fp8_e4m3fn` + `qwen_2.5_vl_7b_fp8_scaled` + `qwen_image_vae` (loaded with the ComfyArt Precise UNET Loader node, see below); `ideogram4_fp8_scaled` + `ideogram4_unconditional_fp8_scaled` + `qwen3vl_8b_fp8_scaled` + `flux2-vae`; the default Agent writes the structured caption Ideogram expects (`ideogram4-caption.json`) |
 | Reference modes (line art, depth, pose, …) | built in code | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) preprocessors (MLSD, HED, normal and segmentation download their annotator weights on first use); with Qwen Image 2512 also `Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors` (controlnet) |
 | Voice input | `transcribe-gemma4` | `gemma4_e4b_it_fp8_scaled.safetensors` (text_encoders) |
 | Upscale | `upscale-ultrasharp-4x` | `4x-UltraSharp.pth` (upscale_models) |
@@ -93,6 +93,8 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 | Voiceover | `speech-kokoro` | [comfyui-kokoro](https://github.com/stavsap/comfyui-kokoro) |
 | Voice cloning | `voice-clone-indextts` | [ComfyUI-Easy-IndexTTS2](https://github.com/yolain/ComfyUI-Easy-IndexTTS2) |
 | Image to 3D | `image-to-3d-trellis2` | `trellis_2_int8_convrot.safetensors`, `trellis_2_shape_vae_bf16.safetensors`, `trellis_2_texture_vae_bf16.safetensors`, `dino_v3_L_naf_fp32.safetensors` (clip_vision), `birefnet.safetensors` |
+| Image to 3D (Pixal3D) | `image-to-3d-pixal3d` | `pixal3d_int8_convrot.safetensors`, `moge_2_vitl_normal_fp16.safetensors` (geometry_estimation), plus the TRELLIS.2 VAEs, `dino_v3_L_naf_fp32.safetensors` and `birefnet.safetensors` above |
+| Multi-view to 3D (Pixal3D) | `image-to-3d-pixal3d-multiview` | `pixal3d_multiview_int8_convrot.safetensors`, plus the TRELLIS.2 VAEs, `dino_v3_L_naf_fp32.safetensors` and `birefnet.safetensors` above |
 
 ## Nodes and routes
 

@@ -15,6 +15,18 @@ import { Popover } from './Popover'
 const COUNTS = [1, 2, 3, 4]
 const RES_LABELS: Record<string, string> = { '1K': '1K', '2K': '2K', custom: t('common.custom') }
 
+function Dim({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const commit = (input: HTMLInputElement) => {
+    const v = Math.round(Number(input.value))
+    const next = input.value.trim() && Number.isFinite(v) ? Math.min(4096, Math.max(64, v)) : value
+    input.value = String(next)
+    if (next !== value) onCommit(next)
+  }
+  return (
+    <label className="ca-num"><span>{label}</span><input key={value} type="number" min={64} max={4096} defaultValue={value} onBlur={(e) => commit(e.currentTarget)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur() }} /></label>
+  )
+}
+
 function RatioShape({ ratio }: { ratio: string }) {
   const [a, b] = ratio.split(':').map(Number)
   const k = 14 / Math.max(a, b)
@@ -86,7 +98,6 @@ export function RunOnPill({ runOn, onPick }: { runOn: string | null; onPick: (ru
 }
 
 export function GenSettings({ p, video, quality, update }: { p: GeneratorShape['props']; video: boolean; quality: boolean; update: Update }) {
-  const dim = (key: 'cw' | 'ch', v: number) => v >= 64 && v <= 4096 && update({ [key]: v })
   return (
     <div className="ca-menu ca-gen__settings">
       <div className="ca-gen__title">{video ? t('genSettings.videoSettings') : t('genSettings.imageSettings')}</div>
@@ -96,8 +107,8 @@ export function GenSettings({ p, video, quality, update }: { p: GeneratorShape['
           <Chips value={p.resolution} options={RESOLUTIONS.map((r) => [r, RES_LABELS[r]] as [string, string])} onPick={(r) => update({ resolution: r })} gen />
           {p.resolution === 'custom' && (
             <div className="ca-style__row">
-              <label className="ca-num"><span>W</span><input type="number" min={64} max={4096} value={p.cw} onChange={(e) => dim('cw', Number(e.target.value))} onKeyDown={(e) => e.stopPropagation()} /></label>
-              <label className="ca-num"><span>H</span><input type="number" min={64} max={4096} value={p.ch} onChange={(e) => dim('ch', Number(e.target.value))} onKeyDown={(e) => e.stopPropagation()} /></label>
+              <Dim label="W" value={p.cw} onCommit={(cw) => update({ cw })} />
+              <Dim label="H" value={p.ch} onCommit={(ch) => update({ ch })} />
             </div>
           )}
         </>
