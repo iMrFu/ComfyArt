@@ -1,17 +1,17 @@
-import { react, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
+import { react, type Editor, type TLImageShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
 import * as actions from './actions'
 import { generateAudio, imageTo3d, MUSIC_MODELS, viewsTo3d, voices } from './assetGen'
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
-import { api, type ImageRef } from './comfy'
+import { api } from './comfy'
 import { LAYOUT_HANDLERS, shapeOf, type Args, type Handler } from './botLayout'
 import { placeInChatFrame } from './chatFrame'
 import { capRefs, createGenerator, generate } from './generate'
 import { customWorkflowCommand } from './customWorkflows'
 import { DURATIONS, RATIOS, VIDEO_RATIOS } from './genOptions'
 import { MAX_VIDEO_REF_KINDS, VIDEO_TARGETS } from './videoGraphs'
-import { type ErrorSink, errorText, fileSrc, GAP, mediaAsset, placeMedia, type Media, resultsAtom } from './jobs'
+import { type ErrorSink, errorText, fileSrc, GAP, resultsAtom } from './jobs'
 import { agentModels } from './models'
 import { modesFor } from './refModes'
 import { AUDIO } from './shapes/EmbedShapes'
@@ -23,10 +23,6 @@ import type { Crop } from './workflows'
 import { CLIENT_ID, onComfyEvent, onReconnect } from './ws'
 
 const AUDIO_MAX_SECONDS = 1000
-
-function mediaSrc(editor: Editor, shape: TLShape): string | null {
-  return mediaAsset(editor, shape)?.props.src ?? null
-}
 
 function imageOf(editor: Editor, id: unknown): TLImageShape {
   const shape = shapeOf(editor, id)
@@ -270,122 +266,6 @@ const HANDLERS: Record<string, Handler> = {
     : imageTo3d(editor, imageOf(editor, args.id), onError, args.model === 'pixal3d' ? 'pixal3d' : 'trellis2')),
   custom_workflow: (_editor, args) => customWorkflowCommand(args),
   wait_generation: (editor, args) => waitResults(editor, (args.ids ?? []).map(String), Number(args.timeout_s) || 60),
-  concat_videos: async (editor, args, onError) => {
-    const raw = Array.isArray(args.clips) ? args.clips : (Array.isArray(args.sources) ? args.sources : [])
-    if (raw.length < 2) throw new Error('concat_videos needs at least 2 clips in clips (or sources)')
-    const clips = raw.map((c: any) => {
-      if (typeof c === 'string') {
-        const src = mediaSrc(editor, shapeOf(editor, c))
-        if (!src) throw new Error(`${c} has no media`)
-        return { url: src }
-      }
-      if (c && typeof c === 'object') {
-        const id = c.source ?? c.url
-        const src = mediaSrc(editor, shapeOf(editor, id))
-        if (!src) throw new Error(`${id} has no media`)
-        return { url: src, ...(c.in != null ? { in: Number(c.in) } : {}), ...(c.out != null ? { out: Number(c.out) } : {}) }
-      }
-      throw new Error('each clip must be a shape id string or {source|url, in?, out?}')
-    })
-    const audio = args.audio === 'first' || args.audio === 'concat' ? args.audio : 'none'
-    let out: any
-    try {
-      const res = await api('/comfyart/concat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clips, audio }),
-      })
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error || `concat failed: ${res.status}`)
-      }
-      out = await res.json()
-    } catch (e) {
-      onError(errorText(e))
-      throw e
-    }
-    const ref: ImageRef = { filename: out.filename, subfolder: out.subfolder, type: out.type }
-    const media: Media = { ref, src: out.url, w: out.width, h: out.height, kind: 'video' }
-    const lastRaw = raw[raw.length - 1]
-    const lastId = typeof lastRaw === 'string' ? lastRaw : (lastRaw.source ?? lastRaw.url)
-    const last = editor.getShapePageBounds(shapeOf(editor, lastId))!
-    const id = placeMedia(editor, media, out.filename || 'concat.mp4', last.maxX + GAP, last.y, last.w)
-    return {
-      id,
-      url: out.url,
-      duration: out.duration,
-      width: out.width,
-      height: out.height,
-      segments: out.num_segments,
-      clip_ranges: out.segments,
-      audio: out.audio,
-      ...(out.note ? { note: out.note } : {}),
-    }
-  },
-  mix_audio_video: async (editor, args, onError) => {
-    const videoId = args.video
-    const audioId = args.audio
-    if (!videoId || !audioId) throw new Error('mix_audio_video needs video and audio shape ids')
-    const vSrc = mediaSrc(editor, shapeOf(editor, videoId))
-    const aSrc = mediaSrc(editor, shapeOf(editor, audioId))
-    if (!vSrc) throw new Error(`${videoId} has no media`)
-    if (!aSrc) throw new Error(`${audioId} has no media`)
-
-    let clips = args.audio_clips
-    if (clips != null && !Array.isArray(clips)) clips = [clips]
-    if (Array.isArray(clips)) {
-      clips = clips.map((c: any) => {
-        const o: any = {}
-        if (c.in != null) o.in = Number(c.in)
-        if (c.out != null) o.out = Number(c.out)
-        if (c.at != null) o.at = Number(c.at)
-        return o
-      })
-    }
-
-    const payload: any = {
-      video: vSrc,
-      audio: aSrc,
-      mode: args.mode === 'mix' ? 'mix' : 'replace',
-    }
-    if (clips) payload.audio_clips = clips
-    if (args.volume != null) payload.volume = Number(args.volume)
-    if (args.bg_volume != null) payload.bg_volume = Number(args.bg_volume)
-    if (args.video_in != null) payload.video_in = Number(args.video_in)
-    if (args.video_out != null) payload.video_out = Number(args.video_out)
-
-    let out: any
-    try {
-      const res = await api('/comfyart/mix_audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error || `mix_audio failed: ${res.status}`)
-      }
-      out = await res.json()
-    } catch (e) {
-      onError(errorText(e))
-      throw e
-    }
-    const ref: ImageRef = { filename: out.filename, subfolder: out.subfolder, type: out.type }
-    const media: Media = { ref, src: out.url, w: out.width, h: out.height, kind: 'video' }
-    const v = editor.getShapePageBounds(shapeOf(editor, videoId))!
-    const id = placeMedia(editor, media, out.filename || 'mix.mp4', v.maxX + GAP, v.y, v.w)
-    return {
-      id,
-      url: out.url,
-      duration: out.duration,
-      width: out.width,
-      height: out.height,
-      mode: out.mode,
-      segments: out.num_segments,
-      clip_ranges: out.segments,
-      ...(out.note ? { note: out.note } : {}),
-    }
-  },
 }
 
 export function registerCommandBus(editor: Editor, project: string, isStale: () => boolean, onError: ErrorSink) {

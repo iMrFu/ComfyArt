@@ -275,25 +275,6 @@ SPECS: dict[str, dict] = {
         {"action": {"type": "string", "enum": ["list", "read", "save"]}, "name": {"type": "string"},
          "path": {"type": "string"}, "instructions": {"type": "string"}},
         ["action"]),
-    "concat_videos": _tool(
-        "Concatenate two or more video or image clips on the canvas into one video. clips (or sources) is a "
-        "list of shape ids, or objects {source|url, in?, out?} to trim each clip. audio: 'first' keeps the "
-        "first clip's audio, 'concat' mixes every clip's audio, 'none' (default) mutes. Returns the merged "
-        "video shape id and URL.",
-        {"clips": {"type": "array", "items": {"type": "string"}},
-         "sources": {"type": "array", "items": {"type": "string"}},
-         "audio": {"type": "string", "enum": ["first", "concat", "none"]}},
-        [], approval="拼接视频"),
-    "mix_audio_video": _tool(
-        "Mix an audio track into a video shape, or replace its audio. video and audio are shape ids. "
-        "mode 'replace' swaps the audio track; 'mix' overlays the new audio under the original. audio_clips: "
-        "optional list of {in, out, at} to place segments; volume / bg_volume (0-1) scale the overlay / "
-        "original; video_in / video_out (seconds) trim the video.",
-        {"video": _ID, "audio": _ID, "mode": {"type": "string", "enum": ["replace", "mix"]},
-         "audio_clips": {"type": "array", "items": _schema({"in": _POINT, "out": _POINT, "at": _POINT})},
-         "volume": {"type": "number"}, "bg_volume": {"type": "number"},
-         "video_in": {"type": "number"}, "video_out": {"type": "number"}},
-        ["video", "audio"], timeout=120, approval="混音"),
     "custom_workflow": _tool(
         "Connect the user's own ComfyUI workflow to a ComfyArt feature (image generation, edit, inpaint, "
         "upscale, video...). action rules: how to mark the nodes, read it first. list: each feature's "
