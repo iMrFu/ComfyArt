@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLERS = {"KSampler", "SamplerCustomAdvanced"}
 MODEL_FILE = "model.id"
+MUSIC_FILE = "spec.model"
 
 
 def _workflow(name: str) -> dict:
@@ -84,7 +85,7 @@ def test_every_named_lookup_finds_one_node():
     assert len(calls) > 20
     assert [src for src, file, _ in calls if file == MODEL_FILE] == ["generate.ts"]
     for src, file, names in calls:
-        if file == MODEL_FILE:
+        if file in (MODEL_FILE, MUSIC_FILE):
             continue
         graph = _workflow(file)
         for name in names:
@@ -120,3 +121,17 @@ def test_image_model_workflows_follow_the_generator_layout():
             assert "steps" in node[name]["inputs"], (m["id"], name)
         for name, key in m["negative"]:
             assert key in node[name]["inputs"], (m["id"], name)
+
+
+def test_music_model_workflows_take_the_music_fields():
+    src = (ROOT / "src" / "assetGen.ts").read_text(encoding="utf-8")
+    ids = re.findall(r"\{ id: '([^']+)', label:", src[src.index("export const MUSIC_MODELS"):])
+    assert len(ids) >= 2
+    [names] = [names for src, file, names in _calls() if file == MUSIC_FILE]
+    for model in ids:
+        graph = _workflow(model)
+        node = {name: graph[_named(graph, name)[0]] for name in names}
+        assert node["prompt"]["class_type"] in {"MiniMaxMusic3TextEncode", "TextEncodeAceStepAudio1.5"}, model
+        assert {"lyrics", "seed"} <= set(node["prompt"]["inputs"]), model
+        assert {"max_duration", "seconds"} & set(node["seconds"]["inputs"]), model
+        assert node["sampler"]["class_type"] in SAMPLERS, model

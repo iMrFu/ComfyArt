@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { atom, useValue, type Editor } from 'tldraw'
 
-import { generateAudio, MUSIC_SECONDS, SFX_SECONDS, voices, type AudioSpec } from '../assetGen'
+import { generateAudio, MUSIC_MODELS, MUSIC_SECONDS, SFX_SECONDS, voices, type AudioSpec } from '../assetGen'
 import { AUDIO, type AudioShape } from '../shapes/EmbedShapes'
 import { Modal } from './Modal'
 import { Chips } from './Chips'
@@ -21,6 +21,7 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
   const [prompt, setPrompt] = useState('')
   const [lyrics, setLyrics] = useState('')
   const [seconds, setSeconds] = useState(30)
+  const [model, setModel] = useState(MUSIC_MODELS[0].id)
   const [picked, setVoice] = useState('')
   const [voiceDesign, setVoiceDesign] = useState('')
   const reference = useValue('selected audio', () => {
@@ -39,7 +40,7 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
   const spec = (): AudioSpec | null => {
     const text = prompt.trim()
     if (!text) return null
-    if (tab === 'music') return { kind: 'music', prompt: text, lyrics: lyrics.trim(), seconds }
+    if (tab === 'music') return { kind: 'music', model, prompt: text, lyrics: lyrics.trim(), seconds }
     if (tab === 'sfx') return { kind: 'sfx', prompt: text, seconds }
     if (voice === VOXCPM2_CLONE && reference) return { kind: 'voxcpm2_clone', text, reference }
     if (voice === VOXCPM2) return { kind: 'voxcpm2', text, voiceDesign: voiceDesign.trim() }
@@ -65,7 +66,14 @@ export function AudioDialog({ editor, onError }: { editor: Editor; onError: (msg
           onKeyDown={(e) => e.stopPropagation()}
         />
         {tab === 'music' && (
-          <textarea className="ca-panel__prompt ca-panel__prompt--boxed" value={lyrics} placeholder={t('audio.lyricsPlaceholder')} onChange={(e) => setLyrics(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+          <>
+            <textarea className="ca-panel__prompt ca-panel__prompt--boxed" value={lyrics} placeholder={t('audio.lyricsPlaceholder')} onChange={(e) => setLyrics(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+            <div className="ca-rename__field"><span>{t('audio.model')}</span>
+              <select className="ca-panel__input" value={model} onChange={(e) => setModel(e.target.value)}>
+                {MUSIC_MODELS.map((m) => <option key={m.id} value={m.id} title={m.desc}>{m.label}</option>)}
+              </select>
+            </div>
+          </>
         )}
         {tab === 'speech' ? (
           <div className="ca-rename__field"><span>{t('audio.voice')}</span>

@@ -200,14 +200,17 @@ export interface Scene { prompt: string; duration: number }
 
 const SCENE_NODES = ['prompt', 'frames', 'seconds', 'seed', 'guider', 'sampler', 'decode', 'audioDecode'] as const
 
-export async function storyboardGraph(scenes: Scene[], aspect: number, firstFrame: string | null): Promise<Built> {
+export async function storyboardGraph(scenes: Scene[], aspect: number, firstFrame: string | null, area: number): Promise<Built> {
   const { graph: t, id } = await loadNamed('i2v-minimax-h3.api.json', ...SCENE_NODES, 'image', 'video', 'save')
-  const [w, h] = videoSize(aspect)
+  const [w, h] = videoSize(aspect, area)
   const nodes = SCENE_NODES.map((name) => id[name])
   const g: PromptGraph = {}
   for (const [n, node] of Object.entries(t)) if (!nodes.includes(n) && n !== id.image) g[n] = node
   if (firstFrame) g[id.image] = { class_type: 'LoadImage', inputs: { image: firstFrame } }
   const local = (i: number, n: string) => `s${i}:${n}`
+  const video = g[id.video].inputs
+  delete g[id.video]
+  const concat: Record<string, unknown> = { codec: 'auto' }
   scenes.forEach((scene, i) => {
     for (const n of nodes) {
       const inputs = Object.fromEntries(Object.entries(t[n].inputs).map(([k, v]) => [k, Array.isArray(v) && nodes.includes(String(v[0])) ? [local(i, String(v[0])), v[1]] : v]))
@@ -222,16 +225,12 @@ export async function storyboardGraph(scenes: Scene[], aspect: number, firstFram
     } else if (firstFrame) node.first_frame = [id.image, 0]
     g[local(i, id.seconds)].inputs.value = scene.duration
     g[local(i, id.seed)].inputs.noise_seed = randomSeed()
+    g[`clip${i}`] = { class_type: 'CreateVideo', inputs: { ...video, images: [local(i, id.decode), 0], audio: [local(i, id.audioDecode), 0], codec: 'auto' } }
+    if (i > 0) g[`cut${i}`] = { class_type: 'Video Slice', inputs: { video: [`clip${i}`, 0], start_time: 1 / Number(video.fps), duration: 0, strict_duration: false } }
+    concat[`videos.video${i}`] = [i > 0 ? `cut${i}` : `clip${i}`, 0]
+    g[`keep${i}`] = { class_type: 'SaveVideo', inputs: { ...g[id.save].inputs, video: [`clip${i}`, 0], filename_prefix: 'comfyart/storyboard/scene' } }
   })
-  let frames: [string, number] = [local(0, id.decode), 0]
-  let audio: [string, number] = [local(0, id.audioDecode), 0]
-  for (let i = 1; i < scenes.length; i++) {
-    g[`trim${i}`] = { class_type: 'ImageFromBatch', inputs: { image: [local(i, id.decode), 0], batch_index: 1, length: 4096 } }
-    g[`join${i}`] = { class_type: 'ImageBatch', inputs: { image1: frames, image2: [`trim${i}`, 0] } }
-    g[`audio${i}`] = { class_type: 'AudioConcat', inputs: { audio1: audio, audio2: [local(i, id.audioDecode), 0], direction: 'after' } }
-    frames = [`join${i}`, 0]
-    audio = [`audio${i}`, 0]
-  }
-  Object.assign(g[id.video].inputs, { images: frames, audio })
-  return { graph: g, result: id.save }
+  g.concat = { class_type: 'ConcatenateVideo', inputs: concat }
+  g[id.save].inputs.video = ['concat', 0]
+  return { graph: g, result: id.save, partial: scenes.map((_, i) => `keep${i}`) }
 }

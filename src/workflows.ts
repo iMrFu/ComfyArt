@@ -3,7 +3,7 @@ import { customGraph, padForOutpaint, pasteBack, resizeTo } from './customWorkfl
 
 export const randomSeed = () => Math.floor(Math.random() * 2 ** 31)
 
-export interface Built { graph: PromptGraph; result: string }
+export interface Built { graph: PromptGraph; result: string; partial?: string[] }
 
 export function annotated(src: string): string {
   const q = new URL(src, location.origin).searchParams

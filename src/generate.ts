@@ -132,11 +132,11 @@ async function generateGraph(shape: GeneratorShape): Promise<Built> {
     colors.length > 0 && palettePrompt(colors),
   ].filter(Boolean).join(' ')
   if (isVideo(workflow)) {
+    const area = VIDEO_AREAS[shape.props.resolution] ?? VIDEO_AREAS['768p']
     const scenes = scenesOf(shape).filter((sc) => sc.prompt.trim())
     if (scenes.length) {
-      return storyboardGraph(scenes.map((sc) => ({ ...sc, prompt: [sc.prompt, suffix].filter(Boolean).join(', ') })), ratioOf(ratio), refs[0] ? annotated(refs[0]) : null)
+      return storyboardGraph(scenes.map((sc) => ({ ...sc, prompt: [sc.prompt, suffix].filter(Boolean).join(', ') })), ratioOf(ratio), refs[0] ? annotated(refs[0]) : null, area)
     }
-    const area = VIDEO_AREAS[shape.props.resolution] ?? VIDEO_AREAS['768p']
     const mode = videoModeOf(shape)
     if (mode === 'refs' && refs.length) return r2vGraph(refs.map((src) => ({ file: annotated(src), kind: refKind(src) })), prompt, ratioOf(ratio), duration, area)
     const motion = motionOf(shape)

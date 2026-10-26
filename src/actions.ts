@@ -8,6 +8,8 @@ import { notify } from './notices'
 import { annotated, anglesGraph, creativeUpscaleGraph, cutoutGraph, editGraph, eraseGraph, expandGraph, layersGraph, moveGraph, samGraph, styleGraph, touchGraph, upscaleGraph, type Built, type Crop } from './workflows'
 import { animateGraph, cutoutVideoGraph, extendGraph, upscaleVideoGraph } from './videoGraphs'
 import { t } from './i18n'
+import type { Edit } from './videoEdit'
+import { timelineGraph } from './videoRender'
 import { canvasBlob } from './canvasBlob'
 
 export interface Pads { l: number; t: number; r: number; b: number }
@@ -28,7 +30,7 @@ function run(
   label: string,
   onError: ErrorSink,
   build: (src: Source) => Promise<Built>,
-  opts: { size?: [number, number]; kind?: MediaKind; placer?: string; extra?: (src: Source) => Record<string, unknown> } = {},
+  opts: { size?: [number, number]; kind?: MediaKind; placer?: string; runOn?: string; extra?: (src: Source) => Record<string, unknown> } = {},
 ) {
   const src = source(editor, shape)
   if (!src) return
@@ -37,6 +39,7 @@ function run(
     name: `${src.name} · ${label}`,
     kind: opts.kind,
     placer: opts.placer,
+    runOn: opts.runOn,
     extra: opts.extra?.(src),
   }, onError)
   return holder
@@ -68,6 +71,9 @@ export const expand = (e: Editor, s: TLImageShape, pads: Pads, prompt: string, e
   return run(e, s, t('common.expand'), err, () => expandGraph(src.image, pads, prompt),
     { size: [(src.w + pads.l + pads.r) * k, (src.h + pads.t + pads.b) * k] })
 }
+
+export const editVideo = (e: Editor, s: TLVideoShape, edit: Edit, err: ErrorSink) =>
+  run(e, s, t('common.edit'), err, (src) => timelineGraph(edit, src.w, src.h), { kind: 'video', runOn: 'local' })
 
 export const animate = (e: Editor, s: TLImageShape, prompt: string, err: ErrorSink, loop = true) =>
   run(e, s, t('common.animateImage'), err, (src) => animateGraph(src.image, src.w, src.h, prompt, loop))

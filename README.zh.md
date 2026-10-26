@@ -79,10 +79,11 @@ Claude Code、Codex、Gemini CLI、Qwen Code、Cursor、VS Code、Claude Desktop
 | 参考生视频（图片、视频、音频） | `r2v-minimax-h3` | `minimax_h3_ref2va_pruned_int8_convrot.safetensors`，外加上面的文本编码器和 VAE |
 | 动作控制 | `r2v-minimax-h3` + 代码内构建的姿态图 | `minimax_h3_fun_controlnet_union_pruned_int8_convrot.safetensors`（model_patches）、`sdpose_wholebody_fp16.safetensors`（checkpoints）、`rt_detr_v4-x-hgnet_fp16.safetensors`（diffusion_models） |
 | 对口型 | `i2v-minimax-h3` + `MiniMaxH3AddGuide` | 上面图生视频的那套文件 |
-| 视频裁剪 | 代码内构建 | 只用核心节点 |
+| 视频剪辑（多片段、配乐、导出） | 代码内构建 | ComfyArt Timeline Render 节点（随 ComfyArt 提供） |
 | 编辑元素 | 代码内构建、`erase-lama` | `rapidocr`（Python 包，`POST /comfyart/ocr`）、SAM3（`sam3.1_multiplex_fp16.safetensors`）、LaMa |
 | 样机 | `mockup-surface` | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) 的 Depth Anything V2（`depth_anything_v2_vitl.pth`，首次使用时下载）、`birefnet.safetensors` |
-| 配乐 | `music-ace-step` | `ace_step_v1_3.5b.safetensors`（checkpoints） |
+| 配乐（MiniMax Music 3） | `music-minimax3` | `minimax_music3_dit_fp16.safetensors`（diffusion_models）、`minimax_music3_text_encoder_pruned_int8_convrot.safetensors`（text_encoders）、`minimax_music3_dav.safetensors`（vae） |
+| 配乐（ACE-Step 1.5） | `music-ace-step15` | `acestep_v1.5_xl_turbo_bf16.safetensors`（diffusion_models）、`qwen_0.6b_ace15.safetensors` 和 `qwen_4b_ace15.safetensors`（text_encoders）、`ace_1.5_vae.safetensors`（vae） |
 | 音效 | `sfx-stable-audio` | `stable-audio-open-1.0.safetensors`（checkpoints）、`t5-base.safetensors`（text_encoders） |
 | 配音 | `speech-kokoro` | [comfyui-kokoro](https://github.com/stavsap/comfyui-kokoro) |
 | 声音克隆 | `voice-clone-indextts` | [ComfyUI-Easy-IndexTTS2](https://github.com/yolain/ComfyUI-Easy-IndexTTS2) |

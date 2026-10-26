@@ -1,7 +1,7 @@
 import { createShapeId, type Editor, type TLImageShape, type TLShapeId } from 'tldraw'
 
 import { cloudMode, loadNamed, loadWorkflow } from './comfy'
-import { freeSpot, GAP, registerPlacer, selectResults, spawnHolder, startJob, type ErrorSink } from './jobs'
+import { freeSpot, GAP, registerPlacer, rowSpots, selectResults, spawnHolder, startJob, type ErrorSink } from './jobs'
 import { AUDIO, AUDIO_SIZE, MODEL } from './shapes/EmbedShapes'
 import { GENERATOR } from './shapes/GeneratorShape'
 import { annotated, randomSeed, type Built } from './workflows'
@@ -12,11 +12,15 @@ const QWEN_VOICES = ['Serena', 'Vivian', 'Uncle_fu', 'Dylan', 'Eric', 'Ryan', 'A
 export const voices = () => (cloudMode() ? QWEN_VOICES : KOKORO_VOICES)
 const LANGS: Record<string, string> = { a: 'English', b: 'English (British)', j: 'Japanese', z: 'Mandarin Chinese', e: 'Spanish', f: 'French', h: 'Hindi', i: 'Italian', p: 'Brazilian Portuguese' }
 export const MUSIC_SECONDS = [15, 30, 60, 120]
+export const MUSIC_MODELS = [
+  { id: 'music-minimax3.api.json', label: 'MiniMax Music 3', desc: 'Complete songs with stable structure and strong vocals. Put genre, tempo, key, language and vocal style in the prompt.' },
+  { id: 'music-ace-step15.api.json', label: 'ACE-Step 1.5', desc: 'Fast. Takes tempo (bpm), lyrics language and key as settings.' },
+]
 export const SFX_SECONDS = [3, 5, 8, 15]
 const MODEL_SIZE = 480
 
 export type AudioSpec =
-  | { kind: 'music'; prompt: string; lyrics: string; seconds: number }
+  | { kind: 'music'; model: string; prompt: string; lyrics: string; seconds: number; bpm?: number; language?: string; key?: string }
   | { kind: 'speech'; text: string; voice: string }
   | { kind: 'clone'; text: string; reference: string }
   | { kind: 'voxcpm2'; text: string; voiceDesign: string }
@@ -25,10 +29,16 @@ export type AudioSpec =
 
 async function audioGraph(spec: AudioSpec): Promise<Built> {
   if (spec.kind === 'music') {
-    const { graph: g, id } = await loadNamed('music-ace-step.api.json', 'prompt', 'seconds', 'sampler', 'save')
-    Object.assign(g[id.prompt].inputs, { tags: spec.prompt, lyrics: spec.lyrics || '[instrumental]' })
-    g[id.seconds].inputs.seconds = spec.seconds
-    g[id.sampler].inputs.seed = randomSeed()
+    const { graph: g, id } = await loadNamed(spec.model, 'prompt', 'seconds', 'sampler', 'save')
+    const seed = randomSeed()
+    const lyrics = spec.lyrics || '[instrumental]'
+    if (g[id.prompt].class_type === 'MiniMaxMusic3TextEncode') {
+      Object.assign(g[id.prompt].inputs, { caption: spec.prompt, lyrics, seed, max_duration: spec.seconds })
+    } else {
+      Object.assign(g[id.prompt].inputs, { tags: spec.prompt, lyrics, seed, duration: spec.seconds, ...(spec.bpm ? { bpm: spec.bpm } : {}), ...(spec.language ? { language: spec.language } : {}), ...(spec.key ? { keyscale: spec.key } : {}) })
+      g[id.seconds].inputs.seconds = spec.seconds
+    }
+    g[id.sampler].inputs.seed = seed
     return { graph: g, result: id.save }
   }
   if (spec.kind === 'sfx') {
@@ -155,12 +165,13 @@ registerPlacer('audio', async (editor, holder, media, job) => {
 
 registerPlacer('model', async (editor, holder, media, job) => {
   const { w, h } = holder.props as { w: number; h: number }
+  const b = editor.getShapePageBounds(holder)!
   const ids: TLShapeId[] = []
   editor.run(() => {
     editor.deleteShape(holder.id)
-    media.forEach((m, i) => {
+    rowSpots(editor, holder, media.map(() => [w, h]), [b.minX, b.minY]).forEach((p, i) => {
       const id = createShapeId()
-      editor.createShape({ id, type: MODEL, x: holder.x + i * (w + GAP), y: holder.y, parentId: holder.parentId, props: { w, h, src: m.src, name: job.name, ext: 'glb' } })
+      editor.createShape({ id, type: MODEL, x: p.x, y: p.y, parentId: holder.parentId, props: { w, h, src: media[i].src, name: job.name, ext: 'glb' } })
       ids.push(id)
     })
   }, { history: 'ignore' })

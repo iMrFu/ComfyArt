@@ -1,7 +1,7 @@
 import { react, type Editor, type TLImageShape, type TLShape, type TLShapeId, type TLVideoShape } from 'tldraw'
 
 import * as actions from './actions'
-import { generateAudio, imageTo3d, viewsTo3d, voices } from './assetGen'
+import { generateAudio, imageTo3d, MUSIC_MODELS, viewsTo3d, voices } from './assetGen'
 import { editElements } from './elements'
 import { bakeToImage, createMockup } from './mockup'
 import { api, type ImageRef } from './comfy'
@@ -13,10 +13,12 @@ import { DURATIONS, RATIOS, VIDEO_RATIOS } from './genOptions'
 import { MAX_VIDEO_REF_KINDS, VIDEO_TARGETS } from './videoGraphs'
 import { type ErrorSink, errorText, fileSrc, GAP, mediaAsset, placeMedia, type Media, resultsAtom } from './jobs'
 import { agentModels } from './models'
+import { modesFor } from './refModes'
 import { AUDIO } from './shapes/EmbedShapes'
 import { GENERATOR, type GeneratorShape } from './shapes/GeneratorShape'
 import { MOCKUP, type MockupShape } from './shapes/MockupShape'
 import { vectorize } from './vectorize'
+import type { Edit, TransitionType } from './videoEdit'
 import type { Crop } from './workflows'
 import { CLIENT_ID, onComfyEvent, onReconnect } from './ws'
 
@@ -75,12 +77,45 @@ function refUrls(editor: Editor, refs: unknown): string[] {
   })
 }
 
+function editOf(editor: Editor, args: Args): Edit {
+  if (!Array.isArray(args.clips) || !args.clips.length) throw new Error('clips: give at least one {id, start, end}')
+  const clips = args.clips.map((c: Args) => {
+    const src = fileSrc(editor, videoOf(editor, c.id))
+    if (!src) throw new Error(`${c.id} has no video file`)
+    const start = Number(c.start) || 0
+    const end = Number(c.end)
+    if (!(end > start)) throw new Error(`clip ${c.id}: end must be after start (seconds in the source video)`)
+    return { src, start, end, speed: Number(c.speed) || 1, volume: c.volume == null ? 1 : Number(c.volume) }
+  })
+  const types: TransitionType[] = ['none', 'fade', 'black', 'white']
+  const transitions = clips.slice(1).map((_, i) => {
+    const tr = Array.isArray(args.transitions) ? args.transitions[i] : null
+    if (tr && !types.includes(tr.type)) throw new Error(`transition type must be one of ${types.join(', ')}`)
+    return { type: (tr?.type ?? 'none') as TransitionType, duration: Number(tr?.duration) || 0.5 }
+  })
+  let music: Edit['music'] = null
+  if (args.music) {
+    const shape = shapeOf(editor, args.music.id)
+    if (shape.type !== AUDIO) throw new Error(`${shape.id} is a ${shape.type}, not an audio element`)
+    const src = fileSrc(editor, shape)!
+    music = { src, name: String((shape.props as { name?: string }).name ?? ''), start: Number(args.music.start) || 0, volume: args.music.volume == null ? 1 : Number(args.music.volume) }
+  }
+  const subtitles = (Array.isArray(args.captions) ? args.captions : []).map((c: Args, i: number) => ({
+    id: `c${i}`, text: String(c.text), start: Number(c.start) || 0, end: Number(c.end), size: Number(c.size) || 56, color: String(c.color ?? '#FFFFFF'),
+  }))
+  return { clips, transitions, subtitles, music }
+}
+
 function startGenerator(editor: Editor, video: boolean, args: Args, onError: ErrorSink, chat: string) {
   const models = agentModels(video)
   const wantsRefs = !video && Array.isArray(args.refs) && args.refs.length > 0
   const model = args.model ? models.find((m) => m.id === args.model) : (wantsRefs && models.find((m) => m.refs)) || models[0]
   if (!model) throw new Error(`unknown model ${JSON.stringify(args.model)} — see list_models`)
-  if (wantsRefs && !model.refs) throw new Error(`${model.label} does not accept refs; use a model with accepts_refs from list_models, or drop refs`)
+  const modes = Array.isArray(args.ref_modes) ? args.ref_modes.map(String) : []
+  const allowed = modesFor(model).map((m) => m.id)
+  const bad = modes.find((m: string) => m && !allowed.includes(m))
+  if (bad) throw new Error(`${model.label} has no ref mode ${JSON.stringify(bad)}; it supports ${allowed.join(', ') || 'none'}`)
+  if (wantsRefs && !model.refs && !(model.control && args.refs.every((_: unknown, i: number) => modes[i]))) throw new Error(`${model.label} does not accept refs; use a model with accepts_refs from list_models, give every ref a structure ref_mode, or drop refs`)
   const ratios = video ? VIDEO_RATIOS : RATIOS
   if (args.ratio && !ratios.includes(args.ratio)) throw new Error(`ratio must be one of ${ratios.join(', ')}`)
   const props = video
@@ -98,6 +133,7 @@ function startGenerator(editor: Editor, video: boolean, args: Args, onError: Err
     ...(motion ? { motion } : {}),
     ...(speech ? { speech } : {}),
     ...(refs.length ? { refs } : {}),
+    ...(!video && modes.length ? { refModes: Object.fromEntries(refs.flatMap((src, i) => (modes[i] ? [[src, modes[i]]] : []))) } : {}),
     ...(!video && args.base ? { base: refUrls(editor, [args.base])[0], strength: Number(args.base_strength) || 60 } : {}),
     ...(video && !mode && args.last_frame ? { lastFrame: refUrls(editor, [args.last_frame])[0] } : {}),
   }
@@ -153,9 +189,14 @@ const HANDLERS: Record<string, Handler> = {
   list_models: () => ({
     image: agentModels(false).map((m) => ({ id: m.id, label: m.label, desc: m.desc, accepts_refs: !!m.refs, ratios: RATIOS })),
     video: agentModels(true).map((m) => ({ id: m.id, label: m.label, desc: m.desc, accepts_first_frame: true, max_reference_images: MAX_VIDEO_REF_KINDS.image, max_reference_videos: MAX_VIDEO_REF_KINDS.video, max_reference_audios: MAX_VIDEO_REF_KINDS.audio, motion_control: true, lip_sync: true, ratios: VIDEO_RATIOS, durations: DURATIONS })),
+    music: MUSIC_MODELS,
   }),
   generate_image: (editor, args, onError, chat) => startGenerator(editor, false, args, onError, chat),
   generate_video: (editor, args, onError, chat) => startGenerator(editor, true, args, onError, chat),
+  edit_video: (editor, args, onError) => {
+    const edit = editOf(editor, args)
+    return started(editor, actions.editVideo(editor, videoOf(editor, args.clips[0].id), edit, onError))
+  },
   edit_image: (editor, args, onError) => started(editor, actions.quickEdit(editor, imageOf(editor, args.id), String(args.prompt), onError)),
   animate_image: (editor, args, onError) => started(editor, actions.animate(editor, imageOf(editor, args.id), String(args.prompt), onError, args.loop !== false)),
   upscale_image: (editor, args, onError) => {
@@ -184,7 +225,14 @@ const HANDLERS: Record<string, Handler> = {
     return started(editor, actions.upscaleVideo(editor, videoOf(editor, args.id), long, onError))
   },
   remove_video_background: (editor, args, onError) => started(editor, actions.cutoutVideo(editor, videoOf(editor, args.id), onError)),
-  generate_music: (editor, args, onError, chat) => toChat(editor, chat, generateAudio(editor, { kind: 'music', prompt: String(args.prompt), lyrics: String(args.lyrics ?? ''), seconds: Math.min(AUDIO_MAX_SECONDS, Math.max(1, Number(args.duration) || 30)) }, onError, true)),
+  generate_music: (editor, args, onError, chat) => {
+    const model = args.model ? MUSIC_MODELS.find((m) => m.id === args.model) : MUSIC_MODELS[0]
+    if (!model) throw new Error(`unknown music model ${JSON.stringify(args.model)} — see list_models`)
+    return toChat(editor, chat, generateAudio(editor, {
+      kind: 'music', model: model.id, prompt: String(args.prompt), lyrics: String(args.lyrics ?? ''), seconds: Math.min(AUDIO_MAX_SECONDS, Math.max(1, Number(args.duration) || 30)),
+      ...(args.bpm ? { bpm: Number(args.bpm) } : {}), ...(args.language ? { language: String(args.language) } : {}), ...(args.key ? { key: String(args.key) } : {}),
+    }, onError, true))
+  },
   generate_sound_effect: (editor, args, onError, chat) => toChat(editor, chat, generateAudio(editor, { kind: 'sfx', prompt: String(args.prompt), seconds: Math.min(AUDIO_MAX_SECONDS, Math.max(1, Number(args.duration) || 8)) }, onError, true)),
   text_to_speech: (editor, args, onError, chat) => {
     const text = String(args.text)

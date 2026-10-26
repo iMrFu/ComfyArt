@@ -85,10 +85,11 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 | Reference to video (images, videos, audio) | `r2v-minimax-h3` | `minimax_h3_ref2va_pruned_int8_convrot.safetensors`, plus the text encoder and VAEs above |
 | Motion control | `r2v-minimax-h3` + pose graph built in code | `minimax_h3_fun_controlnet_union_pruned_int8_convrot.safetensors` (model_patches), `sdpose_wholebody_fp16.safetensors` (checkpoints), `rt_detr_v4-x-hgnet_fp16.safetensors` (diffusion_models) |
 | Lip sync | `i2v-minimax-h3` + `MiniMaxH3AddGuide` | the image-to-video files above |
-| Video trim | built in code | core nodes only |
+| Video editor (several clips, music, export) | built in code | ComfyArt Timeline Render node (ships with ComfyArt) |
 | Edit Elements | built in code, `erase-lama` | `rapidocr` (Python package, `POST /comfyart/ocr`), SAM3 (`sam3.1_multiplex_fp16.safetensors`), LaMa |
 | Mockup | `mockup-surface` | [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) Depth Anything V2 (`depth_anything_v2_vitl.pth`, downloaded on first use), `birefnet.safetensors` |
-| Music | `music-ace-step` | `ace_step_v1_3.5b.safetensors` (checkpoints) |
+| Music (MiniMax Music 3) | `music-minimax3` | `minimax_music3_dit_fp16.safetensors` (diffusion_models), `minimax_music3_text_encoder_pruned_int8_convrot.safetensors` (text_encoders), `minimax_music3_dav.safetensors` (vae) |
+| Music (ACE-Step 1.5) | `music-ace-step15` | `acestep_v1.5_xl_turbo_bf16.safetensors` (diffusion_models), `qwen_0.6b_ace15.safetensors` and `qwen_4b_ace15.safetensors` (text_encoders), `ace_1.5_vae.safetensors` (vae) |
 | Sound effects | `sfx-stable-audio` | `stable-audio-open-1.0.safetensors` (checkpoints), `t5-base.safetensors` (text_encoders) |
 | Voiceover | `speech-kokoro` | [comfyui-kokoro](https://github.com/stavsap/comfyui-kokoro) |
 | Voice cloning | `voice-clone-indextts` | [ComfyUI-Easy-IndexTTS2](https://github.com/yolain/ComfyUI-Easy-IndexTTS2) |
