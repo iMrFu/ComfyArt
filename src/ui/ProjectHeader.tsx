@@ -48,6 +48,7 @@ export function ProjectHeader({ editor, projectId, children }: { editor: Editor;
         <div className="ca-menu ca-head__list">
           <Item close={close} icon={Icons.home} label={t('home.home')} run={() => openView('home')} />
           <Item close={close} icon={Icons.folder} label={t('home.projectLibrary')} run={() => openView('projects')} />
+          <Item close={close} icon={Icons.exit} label={t('home.backToComfyUI')} run={() => void saveNow().then(() => location.assign('/'))} />
           <Item close={close} icon={Icons.plus} label={t('projectHeader.newProject')} run={() => newProject()} />
           <Item close={close} icon={Icons.page} label={t('projectHeader.duplicateProject')} run={() => void saveNow().then(() => duplicateProject(projectId)).then(openProject)} />
           <Item close={close} icon={Icons.trash} label={t('home.deleteCurrentProject')} danger run={() => confirmDelete([projectId], () => openView('projects'))} />

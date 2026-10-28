@@ -25,6 +25,7 @@ export function HomeApp({ view }: { view: View }) {
         <RailBtn icon={Icons.home} label={t('home.home')} on={view === 'home'} onClick={() => openView('home')} />
         <RailBtn icon={Icons.folder} label={t('home.projectLibrary')} on={view === 'projects'} onClick={() => openView('projects')} />
         <div className="ca-rail__spacer" />
+        <RailBtn icon={Icons.exit} label={t('home.backToComfyUI')} onClick={() => location.assign('/')} />
         <SettingsMenu trigger={({ open, toggle }) => <RailBtn icon={Icons.settings} label={t('settings.settings')} on={open} onClick={toggle} />} />
       </nav>
       <main className="ca-home__main">{view === 'home' ? <Home /> : view === 'projects' ? <Projects /> : <NotFound id={view.missing} />}</main>

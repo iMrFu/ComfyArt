@@ -15,6 +15,7 @@ export interface Job {
   placer?: string
   extra?: Record<string, unknown>
   partial?: string[]
+  stopping?: boolean
 }
 
 export interface Media { ref: ImageRef; src: string; w: number; h: number; kind: MediaKind }
@@ -25,6 +26,7 @@ export type Placer = (editor: Editor, holder: TLShape, media: Media[], job: Job,
 export const GAP = 40
 const active = new Set<string>()
 const settled = new Set<string>()
+const dropped = new Map<string, () => void>()
 const placers: Record<string, Placer> = {}
 
 export interface JobResult { srcs: string[]; error?: string }
@@ -155,7 +157,10 @@ async function finish(editor: Editor, holderId: TLShapeId, job: Job, onError: Er
   if (active.has(job.id)) return
   active.add(job.id)
   try {
-    const refs = await waitForImages(job.id, job.node)
+    const refs = await Promise.race([
+      waitForImages(job.id, job.node),
+      new Promise<never>((_, reject) => dropped.set(job.id, () => reject(new Error(t('jobs.interrupted'))))),
+    ])
     settled.add(job.id)
     const media = await Promise.all(refs.map((r) => toMedia(r, refKind(viewUrl(r)) === 'video' ? 'video' : job.kind)))
     const holder = editor.getShape(holderId)
@@ -164,15 +169,31 @@ async function finish(editor: Editor, holderId: TLShapeId, job: Job, onError: Er
     report(holderId, { srcs: media.map((m) => m.src) })
   } catch (e) {
     const holder = editor.getShape(holderId)
+    const stopped = !!(holder && jobOf(holder)?.stopping)
     const kept = holder ? await keepPartial(editor, holder, job).catch(() => 0) : 0
     if (holder?.meta.temp) editor.deleteShape(holderId)
     else if (holder) editor.updateShape({ id: holderId, type: holder.type, meta: { ...holder.meta, job: null, quiet: false } })
-    const msg = errorText(e) + (kept ? ` ${t('jobs.partialKept', kept)}` : '')
+    const msg = (stopped ? t('jobs.interrupted') : errorText(e)) + (kept ? ` ${t('jobs.partialKept', kept)}` : '')
     report(holderId, { srcs: [], error: msg })
-    if (holder) onError(msg)
+    if (holder && !stopped) onError(msg)
   } finally {
     active.delete(job.id)
     settled.delete(job.id)
+    dropped.delete(job.id)
+  }
+}
+
+export async function stopJob(editor: Editor, holderId: TLShapeId) {
+  const holder = editor.getShape(holderId)
+  const job = holder && jobOf(holder)
+  if (!job || job.stopping) return
+  const mark = (stopping: boolean) => editor.updateShape({ id: holderId, type: holder.type, meta: { ...holder.meta, job: { ...job, stopping } as any } })
+  mark(true)
+  try {
+    if (await cancelPrompt(job.id)) dropped.get(job.id)?.()
+  } catch (e) {
+    if (editor.getShape(holderId)) mark(false)
+    throw e
   }
 }
 

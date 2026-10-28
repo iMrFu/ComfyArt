@@ -25,9 +25,15 @@ description: "Install ComfyArt, open the canvas and make your first image."
     ```
   </Step>
   <Step title="Restart ComfyUI and open ComfyArt">
-    Open [http://127.0.0.1:8188/comfyart/](http://127.0.0.1:8188/comfyart/) in your browser. You land on the [home page](/guides/home); click **New Project** for an empty canvas.
+    Click **ComfyArt** in ComfyUI's top bar, or open [http://127.0.0.1:8188/comfyart/](http://127.0.0.1:8188/comfyart/) in your browser. You land on the [home page](/guides/home); click **New Project** for an empty canvas.
+
+    <Frame>
+      <img src="/images/comfyui-topbar.webp" alt="The ComfyArt button in ComfyUI's top bar" />
+    </Frame>
   </Step>
 </Steps>
+
+The button also shows in Comfy Desktop, where there is no address bar to type the URL. To go back, use **Back to ComfyUI** in the home rail or in a project's logo menu.
 
 The built page ships in `dist/`, so you do not need Node.js to use ComfyArt. Only if you change the frontend source in `src/`, rebuild it with `npm install && npm run build`.
 

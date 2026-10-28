@@ -12,6 +12,12 @@
 
 ![Agent 在画布上做出一张 Instagram 海报](docs-site/images/agent-result.webp)
 
+## 三步试用
+
+1. 把 `https://github.com/jtydhr88/ComfyArt` clone 到 `ComfyUI/custom_nodes/`，在 ComfyUI 的环境里运行 `pip install -r requirements.txt`。不用构建，`dist/` 已经提交在仓库里。
+2. 重启 ComfyUI（或 Comfy Desktop）。没有本地 GPU 的话，先设好 `COMFY_API_KEY`，所有工作流都在 [Comfy Cloud](README.md#comfy-cloud) 上跑，不用下载模型。
+3. 点 ComfyUI 顶栏的 **ComfyArt** 按钮，或打开 `http://127.0.0.1:8188/comfyart/`。用 Cloud 时在设置 → 生成位置里选 Comfy Cloud。首页左侧栏和项目左上角的 logo 菜单里都有 **返回 ComfyUI**。
+
 ## 功能
 
 - **首页和项目**：一句话或一个技能就能开始设计，浏览和管理项目，随时切换语言（中文 / English）、主题和对话栏位置。
@@ -93,6 +99,7 @@ Claude Code、Codex、Gemini CLI、Qwen Code、Cursor、VS Code、Claude Desktop
 
 ## 节点和路由
 
+- `web/comfyart.js` 在 ComfyUI 顶栏加一个 ComfyArt 按钮（Comfy Desktop 里也有）。
 - `ComfyArt Precise UNET Loader` 用 manual cast 算子加载扩散模型。ComfyUI 的 `--fast fp8_matrix_mult` 会把 Qwen Image 2512 这类未缩放的 fp8 权重跑成噪点；这个加载器让它加载的模型绕开那条路径。
 - `/comfyart/bot/*`（对话、发送、停止、分支、回答）、`/comfyart/settings` 和 `/comfyart/mcp` 服务于 Agent。
 - `/comfyart/instances` 列出、添加、修改、删除局域网实例；`/comfyart/instances/status` 返回哪些在线以及各自的队列和扩散模型。`POST /comfyart/remote/prompt` 选机器（`target` 是实例 id 或 `auto`）并把任务排上去；`GET /comfyart/remote/history/{instance}/{job}` 和 `POST /comfyart/remote/cancel/{instance}/{job}` 跟进这个任务。

@@ -2,11 +2,14 @@ import { useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 
 import { saveSettings, settingsAtom } from '../bot'
+import { freeMemory } from '../comfy'
 import { lang, setLang, t, type Lang } from '../i18n'
+import { errorText } from '../jobs'
 import { instancesAtom, instanceStatusAtom, loadInstances, targetOptions } from '../instances'
 import { pushEnabled, setPush } from '../notices'
 import { saveTheme, setTheme, themeAtom, THEMES } from '../theme'
 import { dockAtom, setDock } from './chatDock'
+import { reportError, reportSuccess } from './ErrorToasts'
 import { Icons } from './icons'
 import { InstancesDialog } from './InstancesDialog'
 import { Popover } from './Popover'
@@ -56,6 +59,11 @@ export function SettingsMenu({ editor, trigger }: { editor?: Editor; trigger: (p
           <button type="button" className="ca-menu__item" onClick={() => { setOpen(false); setManage(true) }}>
             <span className="ca-icon">{Icons.settings}</span><span className="ca-menu__grow">{t('settings.manageInstances')}</span>
           </button>
+          {editor && (
+            <button type="button" className="ca-menu__item" onClick={() => { setOpen(false); void freeMemory().then((busy) => reportSuccess(t(busy ? 'settings.freeMemoryQueued' : 'settings.freeMemoryDone')), (e) => reportError(errorText(e))) }}>
+              <span className="ca-icon">{Icons.erase}</span><span className="ca-menu__grow">{t('settings.freeMemory')}</span>
+            </button>
+          )}
           {editor && (
             <>
               <div className="ca-menu__sep" />

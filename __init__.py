@@ -9,6 +9,7 @@ from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 ROOT = Path(__file__).parent
 DIST = ROOT / "dist"
 WORKFLOWS = ROOT / "workflows"
+WEB_DIRECTORY = "./web"
 
 routes = PromptServer.instance.routes
 
@@ -38,4 +39,4 @@ async def comfyart_workflow(request: web.Request) -> web.StreamResponse:
 if (DIST / "assets").is_dir():
     routes.static("/comfyart/assets", DIST / "assets")
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

@@ -12,6 +12,12 @@ Documentation with screenshots for every feature: **[comfyart.org](https://comfy
 
 ![The Agent building an Instagram post on the canvas](docs-site/images/agent-result.webp)
 
+## Try it in 3 steps
+
+1. `git clone https://github.com/jtydhr88/ComfyArt` into `ComfyUI/custom_nodes/` and run `pip install -r requirements.txt` in ComfyUI's environment. No build is needed: `dist/` is committed.
+2. Restart ComfyUI (or Comfy Desktop). No local GPU? Set `COMFY_API_KEY` first and every workflow runs on [Comfy Cloud](#comfy-cloud) with no model downloads.
+3. Click **ComfyArt** in ComfyUI's top bar, or open `http://127.0.0.1:8188/comfyart/`. On Cloud, pick Settings → Generate on → Comfy Cloud. **Back to ComfyUI** sits in the home rail and in the logo menu of a project.
+
 ## Features
 
 - **Home and projects**: start a design from one sentence or a skill, browse and manage projects, switch language (中文 / English), theme and chat side at any time.
@@ -99,6 +105,7 @@ Every canvas action runs one of the API workflows in `workflows/` through ComfyU
 
 ## Nodes and routes
 
+- `web/comfyart.js` adds the ComfyArt button to ComfyUI's top bar (also in Comfy Desktop).
 - `ComfyArt Precise UNET Loader` loads a diffusion model with manual cast ops. ComfyUI's `--fast fp8_matrix_mult` turns unscaled fp8 checkpoints such as Qwen Image 2512 into noise; this loader skips that path for the model it loads.
 - `/comfyart/bot/*` (chats, send, stop, branch, answers), `/comfyart/settings` and `/comfyart/mcp` serve the Agent.
 - `POST /comfyart/cloud/prompt`, `GET /comfyart/cloud/history/{job}` and `POST /comfyart/cloud/cancel/{job}` forward jobs to Comfy Cloud with `COMFY_API_KEY`.

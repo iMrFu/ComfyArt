@@ -6,12 +6,16 @@ import {
   T,
   type RecordProps,
   type TLShape,
+  useEditor,
   useValue,
 } from 'tldraw'
 
+import { t } from '../i18n'
 import { instancesAtom, runsOn } from '../instances'
+import { errorText, stopJob } from '../jobs'
 import { isVideo } from '../models'
 import { progressAtom } from '../progress'
+import { reportError } from '../ui/ErrorToasts'
 import { Icons } from '../ui/icons'
 
 export const GENERATOR = 'generator'
@@ -85,7 +89,8 @@ export class GeneratorShapeUtil extends BaseBoxShapeUtil<GeneratorShape> {
 }
 
 function GeneratorCard({ shape }: { shape: GeneratorShape }) {
-  const job = shape.meta.job as { id: string } | undefined
+  const editor = useEditor()
+  const job = shape.meta.job as { id: string; stopping?: boolean } | undefined
   const progress = useValue('generator progress', () => (job ? progressAtom.get()[job.id] : undefined), [job?.id])
   const p = progress && progress.max > 0 ? Math.min(1, progress.value / progress.max) : 0
   const where = useValue('generator runs on', () => (job && instancesAtom.get().some((i) => i.enabled) ? runsOn(job.id) : null), [job?.id])
@@ -94,6 +99,16 @@ function GeneratorCard({ shape }: { shape: GeneratorShape }) {
       <span className="ca-gen-card__icon">{isVideo(shape.props.workflow) ? Icons.video : Icons.image}</span>
       {job && <div className="ca-gen-ring" data-indeterminate={p > 0 ? undefined : true} style={{ '--ca-p': p } as React.CSSProperties} />}
       {job && where && <span className="ca-gen-card__where">{where}</span>}
+      {job && (
+        <button
+          type="button"
+          className="ca-gen-card__stop"
+          title={t('jobs.stop')}
+          disabled={job.stopping}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => void stopJob(editor, shape.id).catch((e) => reportError(errorText(e)))}
+        >{Icons.stop}</button>
+      )}
     </HTMLContainer>
   )
 }
